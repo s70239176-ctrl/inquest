@@ -166,10 +166,24 @@ def decide(j: dict) -> tuple:
     return j["severity"], BOND_RETURNED
 
 
-def _clean_page(body: bytes, limit: int) -> str:
+def _looks_like_html(headers, text: str) -> bool:
+    for key, value in (headers or {}).items():
+        if str(key).lower() == "content-type":
+            raw = value.decode("utf-8", errors="replace") if isinstance(value, (bytes, bytearray)) else str(value)
+            return "html" in raw.lower()
+    head = text[:1000].lower()
+    return "<!doctype html" in head or "<html" in head
+
+
+def _clean_page(body: bytes, limit: int, headers=None) -> str:
+    """
+    Plain text only. Markup is stripped ONLY from real HTML: raw markdown and source code are full of
+    angle brackets that must survive. Our own prompt delimiters are defused so a page cannot close a block.
+    """
     text = body.decode("utf-8", errors="replace")
-    if "<" in text:
+    if _looks_like_html(headers, text):
         text = _TAG_RE.sub(" ", text)
+    text = text.replace("<<<", "< < <").replace(">>>", "> > >")
     text = _SPACE_RE.sub(" ", text)
     text = _BLANKS_RE.sub("\n", text).strip()
     return text[:limit]
@@ -183,7 +197,7 @@ def _fetch(url: str, limit: int):
         return None
     if resp.status != 200 or resp.body is None:
         return None
-    text = _clean_page(resp.body, limit)
+    text = _clean_page(resp.body, limit, resp.headers)
     return text if text != "" else None
 
 
