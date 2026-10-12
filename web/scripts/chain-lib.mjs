@@ -1,4 +1,4 @@
-// Shared helpers for the deploy and smoke scripts. Run from the web/ directory (genlayer-js lives there).
+// Shared helpers for the deploy, smoke and e2e scripts. Run from the web/ directory (genlayer-js lives there).
 import { createAccount, createClient, generatePrivateKey } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 
@@ -8,17 +8,24 @@ export function clientFor(key) {
   return createClient({ chain: studionet, account: key ? createAccount(key) : undefined });
 }
 export const freshKey = () => generatePrivateKey();
+export const addressOf = (key) => createAccount(key).address;
 
 /** Studionet allows ~30 requests a minute per client: retry rate limits and gateway blips. */
+const withTimeout = (promise, ms) =>
+  Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error("request timed out")), ms))]);
+
 export async function paced(fn) {
   for (let i = 0; i < 12; i++) {
     try {
-      return await fn();
+      return await withTimeout(fn(), 90000);
     } catch (e) {
       const text = `${e?.message ?? e} ${JSON.stringify(e?.cause ?? "", (_, v) => (typeof v === "bigint" ? v.toString() : v))}`;
       const m = text.match(/retry_after_seconds\D+(\d+)/);
       if (text.includes("-32029") || m) { await sleep(((m ? Number(m[1]) : 20) + 2) * 1000); continue; }
-      if (/fetch failed|Failed to fetch|ECONNRESET|ETIMEDOUT|<html|<!DOCTYPE|Unexpected token '<'|unknown RPC error|502|503|504/i.test(text)) { await sleep((6 + i * 5) * 1000); continue; }
+      if (/fetch failed|Failed to fetch|ECONNRESET|ETIMEDOUT|timed out|<html|<!DOCTYPE|Unexpected token '<'|unknown RPC error|502|503|504/i.test(text)) {
+        await sleep((6 + i * 5) * 1000);
+        continue;
+      }
       throw e;
     }
   }
@@ -35,19 +42,48 @@ export async function view(client, address, functionName, args = []) {
   return plain(await paced(() => client.readContract({ address, functionName, args })));
 }
 
-const TERMINAL = new Set(["ACCEPTED", "FINALIZED", "UNDETERMINED", "CANCELED", "LEADER_TIMEOUT", "VALIDATORS_TIMEOUT"]);
+export async function balanceOf(client, address) {
+  const hex = await paced(() => client.request({ method: "eth_getBalance", params: [address, "latest"] }));
+  return BigInt(hex);
+}
 
-/** Send a write and poll one cheap RPC until the network settles it. Returns { hash, status, tx }. */
-export async function write(client, address, functionName, args, value = 0n, waitFor = "ACCEPTED") {
+const DEAD = new Set(["UNDETERMINED", "CANCELED", "LEADER_TIMEOUT", "VALIDATORS_TIMEOUT"]);
+
+/** The contract's own refusal text from a leader receipt, or null when the call succeeded. */
+export function revertOf(tx) {
+  const receipts = tx?.consensus_data?.leader_receipt;
+  const leader = receipts?.find((r) => r.mode === "leader") ?? receipts?.[0];
+  if (!leader || leader.execution_result !== "ERROR") return null;
+  const res = typeof leader.result === "string" ? leader.result : leader.result?.payload;
+  if (!res) return "(error without payload)";
+  const bytes = Buffer.from(res, "base64");
+  return bytes.subarray(bytes[0] <= 8 ? 1 : 0).toString("utf8");
+}
+
+/**
+ * Send a write and poll one cheap RPC until the network settles it.
+ * waitFor "ACCEPTED" returns at the first accepted state; "FINALIZED" waits for finalization.
+ * A contract refusal (ERROR receipt) returns immediately. onStatus fires on every status change.
+ * Returns { hash, status, tx, revert }.
+ */
+export async function write(client, address, functionName, args, value = 0n, waitFor = "ACCEPTED", onStatus) {
   const hash = await paced(() => client.writeContract({ address, functionName, args, value }));
   const started = Date.now();
-  while (Date.now() - started < 15 * 60 * 1000) {
+  let last = "";
+  while (Date.now() - started < 20 * 60 * 1000) {
     await sleep(8000);
     const tx = await paced(() => client.request({ method: "eth_getTransactionByHash", params: [hash] }));
     const status = tx?.status ?? "PENDING";
-    if (TERMINAL.has(status) && (waitFor === "ACCEPTED" || status === "FINALIZED" || !["ACCEPTED"].includes(status))) {
-      return { hash, status, tx };
+    if (status !== last) {
+      last = status;
+      if (onStatus) await onStatus(status, tx);
+    }
+    if (DEAD.has(status)) return { hash, status, tx, revert: revertOf(tx) };
+    if (status === "ACCEPTED" || status === "FINALIZED") {
+      const revert = revertOf(tx);
+      if (revert !== null) return { hash, status, tx, revert };
+      if (waitFor === "ACCEPTED" || status === "FINALIZED") return { hash, status, tx, revert: null };
     }
   }
-  return { hash, status: "TIMEOUT", tx: null };
+  return { hash, status: "TIMEOUT", tx: null, revert: null };
 }

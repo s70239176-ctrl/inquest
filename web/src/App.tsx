@@ -1,8 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
-import { Ctx } from "./wallet-context.ts";
-import { connectWallet, activeAccount, getProvider } from "./lib/wallet.ts";
-import { hasContract, describeError } from "./lib/chain.ts";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Ctx, type Session } from "./wallet-context.ts";
+import {
+  activeWalletAccount,
+  connectWallet,
+  createSandbox,
+  forgetSandbox,
+  getProvider,
+  loadSandbox,
+  type Signer,
+} from "./lib/signer.ts";
+import { NETWORK, describeError, hasContract } from "./lib/chain.ts";
 import { shortAddr } from "./lib/format.ts";
+import { Copy, Logo } from "./components/Ui.tsx";
 import { Bounties } from "./screens/Bounties.tsx";
 import { Create } from "./screens/Create.tsx";
 import { BountyPage } from "./screens/BountyPage.tsx";
@@ -12,7 +21,10 @@ import { Mine } from "./screens/Mine.tsx";
 function useHashRoute(): string {
   const [hash, setHash] = useState(window.location.hash || "#/");
   useEffect(() => {
-    const on = () => setHash(window.location.hash || "#/");
+    const on = () => {
+      setHash(window.location.hash || "#/");
+      window.scrollTo(0, 0);
+    };
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
   }, []);
@@ -21,66 +33,125 @@ function useHashRoute(): string {
 
 export function App() {
   const hash = useHashRoute();
-  const [account, setAccount] = useState<string | null>(null);
+  const [signer, setSigner] = useState<Signer | null>(() => loadSandbox());
   const [error, setError] = useState<string | null>(null);
 
+  // follow the browser wallet when it switches account
   useEffect(() => {
-    activeAccount().then(setAccount).catch(() => {});
-    const provider = getProvider() as (ReturnType<typeof getProvider> & { on?: (e: string, f: (a: string[]) => void) => void }) | undefined;
-    provider?.on?.("accountsChanged", (a) => setAccount(a[0] ?? null));
+    const provider = getProvider();
+    provider?.on?.("accountsChanged", (a) => {
+      setSigner((cur) => (cur?.kind === "wallet" ? (a[0] ? { kind: "wallet", address: a[0].toLowerCase() } : null) : cur));
+    });
+    activeWalletAccount().catch(() => null);
   }, []);
 
-  const connect = useCallback(async () => {
+  const doConnect = useCallback(async () => {
     try {
       setError(null);
-      setAccount(await connectWallet());
+      setSigner(await connectWallet());
     } catch (e) {
       setError(describeError(e));
     }
   }, []);
 
-  const parts = hash.replace(/^#\/?/, "").split("/");
-  let page = <Bounties />;
-  if (parts[0] === "create") page = <Create />;
-  else if (parts[0] === "b" && parts[1]) page = <BountyPage id={Number(parts[1])} />;
-  else if (parts[0] === "c" && parts[1]) page = <ClaimPage id={Number(parts[1])} />;
-  else if (parts[0] === "mine") page = <Mine />;
+  const useDemoAccount = useCallback(() => {
+    setError(null);
+    setSigner(loadSandbox() ?? createSandbox());
+  }, []);
 
-  const nav = (to: string, label: string, on: boolean) => (
-    <a href={to} className={on ? "on" : ""}>{label}</a>
+  const disconnect = useCallback(() => {
+    if (signer?.kind === "sandbox") forgetSandbox();
+    setSigner(null);
+  }, [signer]);
+
+  const session: Session = useMemo(
+    () => ({
+      signer,
+      me: signer?.address ?? "",
+      connectWallet: doConnect,
+      useDemoAccount,
+      disconnect,
+      requireSigner: () => signer,
+      error,
+    }),
+    [signer, doConnect, useDemoAccount, disconnect, error],
+  );
+
+  const parts = hash.replace(/^#\/?/, "").split("/");
+  const section = parts[0];
+  let page = <Bounties />;
+  if (section === "create") page = <Create />;
+  else if (section === "b" && parts[1]) page = <BountyPage id={Number(parts[1])} />;
+  else if (section === "c" && parts[1]) page = <ClaimPage id={Number(parts[1])} />;
+  else if (section === "mine") page = <Mine />;
+
+  const link = (to: string, label: string, on: boolean) => (
+    <a href={to} className={on ? "on" : ""} aria-current={on ? "page" : undefined}>
+      {label}
+    </a>
   );
 
   return (
-    <Ctx.Provider value={{ account, connect, error }}>
-      <div className="wrap">
-        <header className="top">
-          <a className="brand" href="#/">Inquest</a>
-          <span className="tag">A bug isn't real until it repros.</span>
-          <nav>
-            {nav("#/", "Bounties", parts[0] === "" || parts[0] === "b" || parts[0] === "c")}
-            {nav("#/create", "Create", parts[0] === "create")}
-            {nav("#/mine", "Mine", parts[0] === "mine")}
+    <Ctx.Provider value={session}>
+      <header className="topbar">
+        <div className="in">
+          <a className="brand" href="#/">
+            <Logo />
+            Inquest
+          </a>
+          <nav aria-label="Main">
+            {link("#/", "Bounties", section === "" || section === "b" || section === "c")}
+            {link("#/create", "Create", section === "create")}
+            {link("#/mine", "Mine", section === "mine")}
           </nav>
           <span className="spacer" />
-          {account ? (
-            <span className="mono muted">{shortAddr(account)}</span>
+          <span className="net" title="Network">
+            <i /> {NETWORK}
+          </span>
+          {signer ? (
+            <span className="acct">
+              <span className="mono muted" title={signer.address}>
+                {signer.kind === "sandbox" ? "demo " : ""}
+                <Copy text={signer.address} label={shortAddr(signer.address)} />
+              </span>
+              <button className="ghost small" onClick={disconnect}>
+                {signer.kind === "sandbox" ? "Reset" : "Disconnect"}
+              </button>
+            </span>
           ) : (
-            <button onClick={connect}>Connect wallet</button>
+            <span className="acct">
+              <button className="small" onClick={doConnect}>
+                Connect wallet
+              </button>
+              <button className="ghost small" onClick={useDemoAccount}>
+                Use demo account
+              </button>
+            </span>
           )}
-        </header>
-        {error && <div className="tx err">{error}</div>}
+        </div>
+      </header>
+      <main className="wrap">
+        {error && (
+          <div className="tx err" role="alert">
+            {error}
+          </div>
+        )}
         {!hasContract && (
-          <div className="tx err">
+          <div className="tx err" role="alert">
             No contract is configured. Set <span className="mono">VITE_CONTRACT_ADDRESS</span> to a deployed Inquest address on Studionet.
           </div>
         )}
+        {signer?.kind === "sandbox" && (
+          <div className="banner">
+            <b>Demo account.</b> A throwaway key stored in this browser, for Studionet test GEN only. Never send real funds to it.
+          </div>
+        )}
         {page}
-        <p className="notice">
-          Inquest reads one public writeup. It never runs a proof of concept, never follows links inside a writeup and never sends
-          traffic to a target. It is not legal advice and does not certify that any software is secure. If the jury cannot decide,
-          no GEN moves.
+        <p className="footer">
+          Inquest reads one public writeup. It never runs a proof of concept, never follows links inside a writeup and never sends traffic
+          to a target. It is not legal advice and does not certify that any software is secure. If the jury cannot decide, no GEN moves.
         </p>
-      </div>
+      </main>
     </Ctx.Provider>
   );
 }

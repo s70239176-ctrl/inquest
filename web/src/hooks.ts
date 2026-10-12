@@ -54,5 +54,16 @@ export function useTx() {
     },
     [],
   );
-  return { state, run, busy: state.kind === "running", reset: () => setState({ kind: "idle" }) };
+  const reset = useCallback(() => setState({ kind: "idle" }), []);
+  return { state, run, busy: state.kind === "running", reset };
+}
+
+/** Re-render on an interval (for "time left" labels) without refetching anything. */
+export function useNow(everyMs = 30000): number {
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), everyMs);
+    return () => clearInterval(t);
+  }, [everyMs]);
+  return now;
 }

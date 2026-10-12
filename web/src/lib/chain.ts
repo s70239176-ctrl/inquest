@@ -3,15 +3,19 @@
  * the page sends what the contract asks for and shows what it answers. Reads are batched (the list
  * views return whole pages) because the hosted RPC allows roughly 30 requests a minute per client.
  */
-import { createClient } from "genlayer-js";
+import { createAccount, createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
-import type { Bounty, BondOutcome, Claim, ClaimStatus, BountyStatus, Page, Phase, Severity, TxOutcome } from "./types.ts";
-import { assertSameAccount, getProvider } from "./wallet.ts";
+import type { Bounty, Claim, Page, Phase, TxOutcome } from "./types.ts";
+import { TIME_DEPENDENT, REFUSALS, decodeRevert, plain, refusalKey, toBounty, toClaim, type Raw } from "./decode.ts";
+import { assertSignerReady, getProvider, type Signer } from "./signer.ts";
+
+export { describeError } from "./decode.ts";
 
 type Hex = `0x${string}`;
 
 export const CONTRACT = (import.meta.env.VITE_CONTRACT_ADDRESS as string | undefined)?.trim() ?? "";
 export const hasContract = /^0x[0-9a-fA-F]{40}$/.test(CONTRACT) && !/^0x0+$/.test(CONTRACT);
+export const NETWORK = studionet.name;
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -22,6 +26,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 interface Loose {
   readContract: (a: unknown) => Promise<unknown>;
   writeContract: (a: unknown) => Promise<unknown>;
+  simulateWriteContract?: (a: unknown) => Promise<unknown>;
   request: (a: { method: string; params: unknown[] }) => Promise<unknown>;
   canAppeal: (a: { txId: Hex }) => Promise<boolean>;
   appealTransaction: (a: unknown) => Promise<unknown>;
@@ -34,13 +39,16 @@ function readClient(): Loose {
   return createClient({ chain: studionet }) as unknown as Loose;
 }
 
-function writeClient(account: string): Loose {
+function writeClient(signer: Signer): Loose {
+  if (signer.kind === "sandbox") {
+    return createClient({ chain: studionet, account: createAccount(signer.key) }) as unknown as Loose;
+  }
   const provider = getProvider();
-  if (!provider) throw new Error("No browser wallet found. Install an EIP-1193 wallet such as MetaMask.");
-  return createClient({ chain: studionet, account: account as Hex, provider: provider as never }) as unknown as Loose;
+  if (!provider) throw new Error("No browser wallet found. Install an EIP-1193 wallet such as MetaMask, or use the demo account.");
+  return createClient({ chain: studionet, account: signer.address as Hex, provider: provider as never }) as unknown as Loose;
 }
 
-// ------------------------------------------------------------------ pacing + errors
+// ------------------------------------------------------------------ pacing
 function safeJson(v: unknown): string {
   try {
     return JSON.stringify(v, (_, x) => (typeof x === "bigint" ? x.toString() : x)) ?? "";
@@ -71,128 +79,16 @@ async function paced<T>(fn: () => Promise<T>): Promise<T> {
   throw new Error("The network kept failing. Try again in a minute.");
 }
 
-function fromB64(s: string): Uint8Array {
-  const bin = atob(s);
-  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
-}
-
-/** The contract's own refusal text, base64 (tag byte + utf-8) in a dry-run error or a leader receipt. */
-function decodeRevert(payload: unknown): string | undefined {
-  if (typeof payload !== "string" || payload === "") return undefined;
-  try {
-    const bytes = fromB64(payload);
-    const text = new TextDecoder().decode(bytes.subarray(bytes[0] !== undefined && bytes[0] <= 8 ? 1 : 0));
-    return /^[\x20-\x7e]{1,80}$/.test(text) ? text : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-const REFUSALS: Record<string, string> = {
-  "empty pool": "Attach some GEN: the pool cannot be empty.",
-  "bad title": "The title must be 1 to 120 characters.",
-  "bad rubric": "The rubric must be non-empty and at most 6,000 characters.",
-  "bad url": "That is not an acceptable public https URL (no credentials, ports, IP addresses or local hosts).",
-  "bad payouts": "Payouts must satisfy high ≥ medium ≥ low > 0.",
-  "bad deadline": "The deadline must be in the future and at most 90 days out.",
-  "bad bond": "The bond must be between 1% and 50% of the low payout.",
-  "pool below high payout": "The pool must cover at least one high payout.",
-  "too late": "The deadline has passed.",
-  "bond mismatch": "Attach exactly the bounty's bond.",
-  "pending exists": "You already have a claim waiting for a verdict on this bounty.",
-  "attempt limit": "You have used all 3 claims allowed on this bounty.",
-  "claim limit": "This bounty already has the maximum 40 claims.",
-  "not project": "Only the project that created the bounty can do that.",
-  "nothing to withdraw": "Nothing is withdrawable yet. The deadline must pass (or the bounty end) and no claim may be waiting.",
-  "already resolved": "This claim already has a verdict.",
-  "not open": "This bounty is no longer open.",
-  "has claims": "A bounty with claims cannot be cancelled.",
-  "project cannot claim": "The project cannot claim its own bounty.",
-  "bad judgment": "The jury returned something unusable. Nothing moved. Try resolving again.",
-};
-
-export function describeError(e: unknown): string {
-  const cause = (e as { cause?: { data?: { receipt?: { result?: unknown } } } })?.cause;
-  const decoded = decodeRevert(cause?.data?.receipt?.result);
-  if (decoded) return REFUSALS[decoded] ?? decoded;
-  const msg = e instanceof Error ? e.message : String(e);
-  if (/user rejected|denied|4001/i.test(msg)) return "You declined the request in your wallet.";
-  return msg.length > 300 ? msg.slice(0, 300) + "…" : msg;
-}
-
-// ------------------------------------------------------------------ decoding views
-/** genlayer-js may hand back Maps for contract dicts; normalise to plain objects (bigints kept). */
-function plain(v: unknown): unknown {
-  if (v instanceof Map) return Object.fromEntries([...v.entries()].map(([k, x]) => [String(k), plain(x)]));
-  if (Array.isArray(v)) return v.map(plain);
-  if (v && typeof v === "object" && !(v instanceof Uint8Array)) {
-    return Object.fromEntries(Object.entries(v as object).map(([k, x]) => [k, plain(x)]));
-  }
-  return v;
-}
-
-const big = (v: unknown): bigint => BigInt(v as never);
-const n = (v: unknown): number => Number(v);
-const nullable = <T,>(v: unknown, f: (x: unknown) => T): T | null => (v === null || v === undefined ? null : f(v));
-const hex = (v: unknown): string => String(v).toLowerCase();
-
-type Raw = Record<string, unknown>;
-
-export function toBounty(r: Raw): Bounty {
-  return {
-    id: n(r.id),
-    project: hex(r.project),
-    title: String(r.title),
-    repoUrl: String(r.repo_url),
-    rubric: String(r.rubric),
-    lowPayout: big(r.low_payout),
-    mediumPayout: big(r.medium_payout),
-    highPayout: big(r.high_payout),
-    bond: big(r.bond),
-    deadline: n(r.deadline),
-    createdAt: n(r.created_at),
-    status: String(r.status) as BountyStatus,
-    pool: big(r.pool),
-    slashed: big(r.slashed),
-    claimIds: (r.claim_ids as unknown[]).map(n),
-    acceptedIds: (r.accepted_ids as unknown[]).map(n),
-    claimCount: n(r.claim_count),
-    pendingCount: n(r.pending_count),
-    withdrawable: big(r.withdrawable),
-  };
-}
-
-export function toClaim(r: Raw): Claim {
-  return {
-    id: n(r.id),
-    bountyId: n(r.bounty_id),
-    researcher: hex(r.researcher),
-    url: String(r.url),
-    bond: big(r.bond),
-    status: String(r.status) as ClaimStatus,
-    evidenceAvailable: nullable(r.evidence_available, Boolean),
-    demonstrated: nullable(r.demonstrated, Boolean),
-    inScope: nullable(r.in_scope, Boolean),
-    duplicateOf: nullable(r.duplicate_of, n),
-    severity: nullable(r.severity, (x) => String(x) as Severity),
-    payout: big(r.payout),
-    bondOutcome: String(r.bond_outcome) as BondOutcome,
-    createdAt: n(r.created_at),
-    resolvedAt: n(r.resolved_at),
-  };
-}
-
+// ------------------------------------------------------------------ reads
 async function view(functionName: string, args: unknown[]): Promise<unknown> {
   if (!hasContract) throw new Error("No contract address is configured. Set VITE_CONTRACT_ADDRESS.");
-  const raw = await paced(() =>
-    readClient().readContract({ address: CONTRACT as Hex, functionName, args }),
-  );
+  const raw = await paced(() => readClient().readContract({ address: CONTRACT as Hex, functionName, args }));
   return plain(raw);
 }
 
 export async function listBounties(offset = 0, limit = 20): Promise<Page<Bounty>> {
   const r = (await view("list_bounties", [BigInt(offset), BigInt(limit)])) as Raw;
-  return { total: n(r.total), items: (r.items as Raw[]).map(toBounty) };
+  return { total: Number(r.total), items: (r.items as Raw[]).map(toBounty) };
 }
 
 export async function getBounty(id: number): Promise<Bounty> {
@@ -206,11 +102,7 @@ export async function getClaim(id: number): Promise<Claim> {
 /** bountyId 0 = every bounty. researcher "" = anyone. */
 export async function listClaims(bountyId: number, researcher = "", offset = 0, limit = 20): Promise<Page<Claim>> {
   const r = (await view("list_claims", [BigInt(bountyId), researcher, BigInt(offset), BigInt(limit)])) as Raw;
-  return { total: n(r.total), items: (r.items as Raw[]).map(toClaim) };
-}
-
-export async function getLedger(bountyId: number): Promise<bigint> {
-  return big(await view("get_ledger", [BigInt(bountyId)]));
+  return { total: Number(r.total), items: (r.items as Raw[]).map(toClaim) };
 }
 
 export async function chainNow(): Promise<number> {
@@ -218,6 +110,13 @@ export async function chainNow(): Promise<number> {
     readClient().request({ method: "eth_getBlockByNumber", params: ["latest", false] }),
   )) as { timestamp?: string } | null;
   return block?.timestamp ? Number(BigInt(block.timestamp)) : Math.floor(Date.now() / 1000);
+}
+
+/** GEN the contract itself holds: pools + slashed bonds + live bonds. (Studionet does not credit ordinary accounts.) */
+export async function contractBalance(): Promise<bigint> {
+  if (!hasContract) return 0n;
+  const hex = (await paced(() => readClient().request({ method: "eth_getBalance", params: [CONTRACT, "latest"] }))) as string;
+  return BigInt(hex);
 }
 
 // ------------------------------------------------------------------ writes
@@ -279,9 +178,23 @@ async function follow(hash: string, onPhase?: (p: Phase, detail?: string) => voi
   };
 }
 
-/** Estimate fees, send `value` separately from the fees, then wait for finalization. */
+/**
+ * A refused payable call keeps its attached GEN inside the contract on this runtime (measured), so before any value
+ * leaves the account the call is dry-run. Clock-dependent refusals never block: a dry run may see a stale time.
+ */
+async function preflight(client: Loose, functionName: string, args: unknown[], value: bigint): Promise<void> {
+  if (value === 0n || !client.simulateWriteContract) return;
+  try {
+    await paced(() => client.simulateWriteContract!({ address: CONTRACT as Hex, functionName, args, value }));
+  } catch (e) {
+    const refusal = refusalKey(e);
+    if (refusal && !TIME_DEPENDENT.has(refusal)) throw new Error(REFUSALS[refusal] ?? refusal);
+  }
+}
+
+/** Send a write (dry-run first when it carries GEN), then follow it to finalization. */
 export async function sendTx(
-  account: string,
+  signer: Signer,
   functionName: string,
   args: unknown[],
   value = 0n,
@@ -289,19 +202,19 @@ export async function sendTx(
   onHash?: (hash: string) => void,
 ): Promise<TxOutcome> {
   if (!hasContract) throw new Error("No contract address is configured. Set VITE_CONTRACT_ADDRESS.");
-  await assertSameAccount(`wallet:${account}`);
-  const client = writeClient(account);
+  await assertSignerReady(signer);
+  const client = writeClient(signer);
   onPhase?.("signing");
+  await preflight(client, functionName, args, value);
+
   let fees: unknown;
   if (client.estimateTransactionFeesForWrite) {
     try {
       const est = await paced(() =>
-        client.estimateTransactionFeesForWrite!({ account, address: CONTRACT, functionName, args, value }),
+        client.estimateTransactionFeesForWrite!({ account: signer.address, address: CONTRACT, functionName, args, value }),
       );
       fees = { distribution: est.distribution, messageAllocations: est.messageAllocations, feeValue: est.feeValue };
-    } catch (e) {
-      const decoded = describeError(e);
-      if (Object.values(REFUSALS).includes(decoded)) throw new Error(decoded);
+    } catch {
       fees = undefined; // estimation unavailable: let the SDK use its defaults
     }
   }
@@ -330,19 +243,19 @@ export async function appealInfo(txHash: string): Promise<AppealInfo> {
   return { appealable: true, charge };
 }
 
-export async function appeal(account: string, txHash: string, charge: bigint): Promise<string> {
-  await assertSameAccount(`wallet:${account}`);
-  const client = writeClient(account);
+export async function appeal(signer: Signer, txHash: string, charge: bigint): Promise<string> {
+  await assertSignerReady(signer);
+  const client = writeClient(signer);
   const out = await paced(() => client.appealTransaction({ txId: txHash as Hex, value: charge }));
   return String(out);
 }
 
 // ------------------------------------------------------------------ resolve tx memory (this browser only)
-const key = (claimId: number) => `inquest:${CONTRACT.toLowerCase()}:resolve:${claimId}`;
+const memKey = (claimId: number) => `inquest:${CONTRACT.toLowerCase()}:resolve:${claimId}`;
 
 export function rememberResolveTx(claimId: number, hash: string): void {
   try {
-    localStorage.setItem(key(claimId), hash);
+    localStorage.setItem(memKey(claimId), hash);
   } catch {
     /* private mode: the appeal button just won't know the hash */
   }
@@ -350,7 +263,7 @@ export function rememberResolveTx(claimId: number, hash: string): void {
 
 export function recallResolveTx(claimId: number): string | null {
   try {
-    return localStorage.getItem(key(claimId));
+    return localStorage.getItem(memKey(claimId));
   } catch {
     return null;
   }

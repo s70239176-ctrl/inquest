@@ -2,115 +2,101 @@
 
 **A bug isn't real until it repros.**
 
-Inquest is a GenLayer app that pays a bug bounty only when a jury of validators agrees that a **public writeup** proves an **in-scope, non-duplicate** bug.
+Inquest is a bug bounty that **settles on GenLayer**. A project locks GEN and a frozen rubric. A researcher submits one **public writeup URL** and a small bond. Each validator fetches that page itself and answers one fixed schema of five fields. A plain table then pays, slashes or refunds, and GEN moves only when the verdict finalizes. **If the jury cannot decide, the money does not move.**
 
-A project locks GEN and a frozen rubric. A researcher submits one public https URL plus a bond. Each validator fetches the page itself and answers one fixed schema of five fields. A plain table then pays, slashes or refunds. If the jury cannot decide, no GEN moves.
+There is no admin key, no moderator, no backend model and no oracle. GenLayer is the settlement layer: take it away and nobody is left to decide.
 
 > **Inquest does not run exploits and does not certify that software is secure.** It reads one public writeup. It never executes a proof of concept, never follows links found inside a writeup, and never sends traffic to a target. It is not legal advice, a security warranty, or permission to attack anything.
+
+## Why this needs GenLayer
+
+"Does this writeup actually prove an in-scope, non-duplicate bug?" is a judgment over untrusted prose. A normal contract cannot read a page, and a centralized reviewer is exactly the trusted party a bounty is trying to avoid. GenLayer lets independent validators each read the evidence and agree on a small structured answer, and lets the contract act on that answer.
+
+The writeup is **hostile input**. It may contain text telling the model to pay. That text is evidence, never a command: it is fenced as untrusted data, and a leader that obeys it produces a different five-field object from an honest validator and is rejected. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## How it works
 
 ```
-project --create_bounty(rubric, payouts, bond) + GEN pool--> Inquest contract
-researcher --submit_claim(url) + bond--> PENDING claim            (no judging here)
-anyone --resolve_claim(id)--> validators fetch the page themselves, answer five fields
-                             --> deterministic table --> GEN moves ON FINALIZATION
+project    create_bounty(rubric, payouts, bond) + GEN pool        rubric & pool frozen
+researcher submit_claim(url) + bond                               PENDING, nothing judged yet
+anyone     resolve_claim(id)                                      validators fetch + answer 5 fields
+contract   decide(five fields)  ──►  pay / slash / refund          GEN moves only on FINALIZATION
 ```
 
-The only judgment (the whole schema):
+The only judgment:
 
 ```json
 { "evidence_available": false, "demonstrated": false, "in_scope": false, "duplicate_of": null, "severity": "none" }
 ```
-
-Normalization happens in ordinary code before consensus is compared: no evidence forces everything false/none; not demonstrated, out of scope or duplicate forces severity `none`; `duplicate_of` must be `null` or an already accepted claim id on the same bounty, otherwise the result is invalid. Validators accept the leader **only when all five normalized fields equal their own independent result**. Prose is never compared.
 
 | Normalized result | Pool | Bond |
 | --- | --- | --- |
 | Evidence unavailable (dead URL, login wall, not a writeup) | unchanged | returned |
 | Not demonstrated, or out of scope | unchanged | slashed to the project |
 | Duplicate of an accepted claim | unchanged | returned |
-| Demonstrated, in scope, not a duplicate, severity low / medium / high | pays that band's absolute amount (capped by the remaining pool) | returned |
+| Demonstrated, in scope, original, severity low / medium / high | pays that band (capped by the remaining pool) | returned |
 
-The judge may read only: the frozen rubric, the submitted URL, and up to the 8 most recent accepted claim URLs on that bounty (12,000 / 4,000 characters). It never fetches the repo or any link inside a page. Page text is placed in delimited blocks and declared untrusted data in the prompt.
-
-### Money safety
-
-- Every GEN movement is `emit_transfer(..., on="finalized")`: nothing leaves the contract on a provisional accept. A protocol appeal that overturns a round discards that round's messages.
-- `resolve_claim` flips the claim to `RESOLVED` before anything else; a second call fails with `already resolved`. Payout is capped by the remaining pool.
-- There is no admin, no moderator, no rubric edit, no payout change, and no `appeal` method. A wrong jury is a **protocol appeal** (`canAppeal`, appeal charge, `appealTransaction` on the resolve transaction); the claim page shows the window, the charge and the button.
-- `withdraw` (slashed bonds plus leftover pool) works for the project only after the deadline, or when the bounty is depleted or cancelled, and only with zero claims waiting.
-
-### Choices the spec left open (flagged, easy to change)
-
-- A claim that is **demonstrated, in scope, not a duplicate, but under the lowest severity bar** (`severity: none`) pays nothing and **returns** the bond: the report is real, just below the rubric. The spec's table has no row for it.
-- Claim URLs and `repo_url` must be a DNS name with no port or credentials; raw IPs (which covers `169.254.x.x`), `localhost`, `.local`, `.internal` are refused. This is stricter than the spec.
-- A model that **omits `duplicate_of`** is read as `null` (observed on Studionet); any other missing field makes its answer invalid. Extra prose keys are dropped, never compared. A *leader result* with extra keys is rejected.
-- `withdrawable` / `get_ledger` are computed from the datetime the node supplies to a view call, which may lag the chain. `withdraw` re-checks every condition at transaction time, so a stale view can only show a wrong button, never move GEN.
-
-## Layout
-
-```
-contracts/inquest.py        the Intelligent Contract
-tests/direct/               Direct Mode tests (96) - run without a network
-web/                        Vite + React + TypeScript + genlayer-js app (Studionet)
-web/scripts/                deploy.mjs, smoke.mjs (live), plus small debugging helpers
-```
+Validators accept the leader **only when all five normalized fields equal their own independently fetched result**. Prose is never compared. The judge reads only the frozen rubric, the submitted URL, and up to 8 earlier accepted claim URLs on the same bounty.
 
 ## Run it
 
 ```bash
-# contract tests (Windows needs the optional loader plugin)
+# contract: lint + Direct Mode tests (no network)
 pip install -r requirements.txt
-PYTHONPATH=scripts python -m pytest -p windows_direct_plugin     # or plain `pytest` on Linux/macOS
 genvm-lint check contracts/inquest.py
+python -m pytest                                  # Windows: PYTHONPATH=scripts python -m pytest -p windows_direct_plugin
 
-# deploy to Studionet (gasless throwaway key) and write web/.env.local
-cd web && npm install && node scripts/deploy.mjs
+# web app
+cd web && npm install
+node scripts/deploy.mjs                           # deploys to Studionet, writes web/.env.local
+npm run dev                                       # http://localhost:5173
 
-# live end-to-end smoke test against a deployed address
-node scripts/smoke.mjs 0x...
-
-# app
-npm run dev          # http://localhost:5173, set VITE_CONTRACT_ADDRESS in web/.env.local
-npm run build && npm test
+# the full live suite against Studionet (real validators, real page fetches, real GEN accounting)
+node e2e/live.mjs                                 # writes docs/E2E-REPORT.md
 ```
 
-The app uses an EIP-1193 wallet (MetaMask) on Studionet. Amounts are native GEN; the UI converts to wei.
+The app signs with a browser wallet (MetaMask) or a built-in **demo account** (a throwaway Studionet key in `localStorage`), so anyone can try it without installing anything. Amounts are native GEN.
 
-**genlayer-js version:** the app pins `genlayer-js@1.1.8`. The `2.0.0-rc.1` release candidate (which adds `getAppealCharge` and `estimateTransactionFeesForWrite`) was tried first and **cannot read from or deploy to the live Studionet** (reads hit the receive handler, a deploy ended `NO_MAJORITY` with no validators). `web/src/lib/chain.ts` feature-detects both 2.x calls and falls back to `getMinAppealBond` and SDK-default fees, so it upgrades when Studionet does.
+## Tests
 
-## Test status
-
-Spec tests (Direct Mode, `tests/direct/test_inquest.py`):
-
-| # | Case | Status |
+| Layer | What | Result |
 | --- | --- | --- |
-| 1 | Injection page cannot move the pool; bond slashed; never high | pass |
-| 2 | In-scope high pays high, returns bond | pass |
-| 3 | Borderline severity pays the lower band | pass |
-| 4 | Out of scope slashes | pass |
-| 5 | Duplicate returns bond, "novel" claim ignored | pass |
-| 6 | Same symptom, different cause is paid | pass |
-| 7 | Dead URL returns bond, never slashes; unanimous, no model call | pass |
-| 8 | Different wording, same five fields: consensus accepts | pass |
-| 9 | Field mismatch (low vs high, any single field): validator rejects | pass |
-| 10 | Pool of one high payout depletes; slashed bond still withdrawable | pass |
-| 11 | Cancel returns pool; cancel after a claim fails | pass |
-| 12 | Deadline: late submit fails; withdraw with a pending claim fails | pass |
-| 13 | Appeal safety | **partial**: no double resolve, all transfers `finalized`, an overturned round leaves no payout (simulated by snapshot/revert) |
-| 14 | Link trap: only the claim URL and prior accepted URLs are ever requested | pass |
+| Contract lint | `genvm-lint` | passes |
+| Contract, Direct Mode | `tests/direct` (spec cases 1-14 plus rules, views, page-text handling) | see below |
+| Web | typecheck, unit tests (decoding, formatting, rubric), production build | passes |
+| **Live end to end** | `web/e2e/live.mjs` on Studionet, fixtures fetched from GitHub | see [docs/E2E-REPORT.md](docs/E2E-REPORT.md) |
 
-`genvm-lint` passes. Live on Studionet (`web/scripts/smoke.mjs`): create, submit and resolve ran end to end against real validators. A page that is not a writeup and a dead URL both resolved to `evidence_available: false` with the bond returned. A long, borderline real writeup ended **UNDETERMINED** (validators disagreed on the five fields) so nothing moved and the claim stayed pending, which is the intended fail-safe.
+The live suite is not mocked: a fresh contract is deployed, validators fetch the fixture pages (`fixtures/tinyparse/`, a fictional C library) and run their own models, and money is verified through the contract's own balance (Studionet does not credit ordinary accounts). It covers an in-scope high payout, a medium payout, an out-of-scope slash, a duplicate that calls itself novel, a prompt-injection page, a dead URL, the pool/economy limits, cancel, deadline rules, withdraw, **provisional-vs-finalized money movement**, and a **live protocol appeal**.
 
-### Not verified
+## Repository layout
 
-- **A live payout.** No live claim has yet earned a payout, so the finalized transfer to a researcher has not been observed on Studionet. Direct Mode only proves the transfer is scheduled with `on="finalized"`.
-- **A live protocol appeal** (spec test 13 in Studio) was not run, and the Appeal button is untested against a real appealable transaction.
-- **The web UI has been typechecked and built but not driven in a browser** with a wallet.
-- Studionet does not credit ordinary accounts on `emit_transfer`, so payouts are visible in the contract's state and balance, not in a researcher's wallet balance.
+```
+contracts/inquest.py      the Intelligent Contract
+tests/direct/             offline contract tests
+web/                      Vite + React + TypeScript + genlayer-js
+web/e2e/live.mjs          the live end-to-end suite
+web/scripts/              deploy, smoke and debugging helpers
+fixtures/tinyparse/       public writeups with known ground truth
+docs/                     architecture, demo script, e2e report
+```
+
+## Design choices worth knowing
+
+- **Money is ordinary code.** No model is ever asked about value. `decide()` is a pure function of the five normalized fields.
+- **Every transfer is `emit_transfer(on="finalized")`.** A provisional result moves nothing; an appeal that overturns the round discards its messages.
+- **`resolve_claim` is idempotent.** The claim flips to `RESOLVED` first, so a re-execution cannot pay twice.
+- **No page text and no model prose is stored**, only the five fields, the payout and the bond outcome.
+- **A claim that is real and in scope but below the lowest severity bar** pays nothing and returns the bond (the spec's table has no row for it).
+- **Claim URLs** must be a DNS name with no port or credentials; raw IPs, `localhost`, `.local`, `.internal` are refused.
+- **A refused payable call keeps its attached GEN in the contract** on this runtime, so the UI validates inputs and dry-runs payable calls before any value leaves the account.
+- **genlayer-js 1.1.8** is pinned: the 2.0 release candidate cannot read from or deploy to the live Studionet. `web/src/lib/chain.ts` feature-detects the 2.x-only calls.
 
 ## Known limits
 
-- Requiring all five fields to match makes borderline writeups likely to end UNDETERMINED. That is by design (no consensus, no money), but it costs liveness. Short, concrete writeups with a clear reproduction agree most often.
-- `list_claims` scans all claims (fine at hackathon scale, 40 claims per bounty); the resolve transaction id is remembered per browser, so on another device paste it to check the appeal window.
+- Requiring all five fields to match makes long or borderline writeups likely to end **UNDETERMINED** (nothing moves, resolve again). That is the intended fail-safe; short, concrete writeups with a clear reproduction agree most often.
+- Studionet only. `list_claims` scans all claims (fine at 40 claims per bounty).
+- The resolve transaction id is remembered per browser; on another device paste it to check the appeal window.
+
+## Roadmap
+
+Per-bounty reviewer allow-lists for private disclosures, severity calibration against CVSS vectors in the rubric, claim batching, and mainnet deployment once appeals are production-ready.
