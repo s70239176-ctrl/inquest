@@ -2,8 +2,11 @@
 
 **One line.** A bug bounty that pays only when a GenLayer jury agrees a public writeup proves an in-scope, non-duplicate bug. No admin key, no moderator, no backend model.
 
+**Live app.** https://inquest-repro.vercel.app/  
 **Repository.** https://github.com/s70239176-ctrl/inquest  
-**Network.** GenLayer Studionet. A fresh contract is deployed by `web/e2e/live.mjs` on every run; the address of the last verified run is in [docs/E2E-REPORT.md](docs/E2E-REPORT.md).
+**Network.** GenLayer Studionet (chain id 61999)  
+**Contract.** [`0x87664D7a67991E117F02507048c14C69D30bC6E4`](https://explorer-studio.genlayer.com/address/0x87664D7a67991E117F02507048c14C69D30bC6E4) on the GenLayer Studio Explorer, deployed by [`0xa89bc803…e032ab34`](https://explorer-studio.genlayer.com/tx/0xa89bc80321a8154061e6aa76491e5713b444b28c3d1aa67664391ee4e032ab34).  
+**Live test run.** `web/e2e/live.mjs` deploys a fresh contract on every run; the address and every transaction hash of the last verified run are in [docs/E2E-REPORT.md](docs/E2E-REPORT.md).
 
 ## The problem
 

@@ -10,6 +10,20 @@ Inquest is a bug bounty that **settles on GenLayer**. A project locks GEN and a 
 
 There is no admin key, no moderator, no backend model and no oracle. GenLayer is the settlement layer: take it away and nobody is left to decide.
 
+## Live
+
+| | |
+| --- | --- |
+| **Live app** | https://inquest-repro.vercel.app/ |
+| **Network** | GenLayer Studionet (chain id `61999`, RPC `https://studio.genlayer.com/api`) |
+| **Contract** | [`0x87664D7a67991E117F02507048c14C69D30bC6E4`](https://explorer-studio.genlayer.com/address/0x87664D7a67991E117F02507048c14C69D30bC6E4) on the GenLayer Studio Explorer |
+| **Deploy transaction** | [`0xa89bc803…e032ab34`](https://explorer-studio.genlayer.com/tx/0xa89bc80321a8154061e6aa76491e5713b444b28c3d1aa67664391ee4e032ab34) |
+| **Source** | https://github.com/s70239176-ctrl/inquest |
+
+The hosted app talks to that contract out of the box (the address is committed in `web/.env.production`; set `VITE_CONTRACT_ADDRESS` to point a build elsewhere). No wallet is needed: **Use demo account** signs with a throwaway Studionet key. The contract page lists every transaction, including the `create_bounty`, `submit_claim` and `resolve_claim` calls behind the demo data.
+
+Studionet is a shared test network and can be reset, so the address above is a snapshot. `node web/scripts/deploy.mjs` deploys a fresh contract and `node web/e2e/live.mjs` re-runs the full live suite against a new one (its latest address and transaction hashes are in [docs/E2E-REPORT.md](docs/E2E-REPORT.md)).
+
 > **Inquest does not run exploits and does not certify that software is secure.** It reads one public writeup. It never executes a proof of concept, never follows links found inside a writeup, and never sends traffic to a target. It is not legal advice, a security warranty, or permission to attack anything.
 
 <table>
