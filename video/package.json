@@ -1,0 +1,15 @@
+{
+  "name": "inquest-video",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Storyboard-driven demo video: captures the live app, adds captions, optional ElevenLabs voiceover, encodes with ffmpeg.",
+  "scripts": {
+    "capture": "node capture.mjs",
+    "voiceover": "node voiceover.mjs",
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "^23.11.1"
+  }
+}

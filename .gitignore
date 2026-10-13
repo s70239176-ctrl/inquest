@@ -8,3 +8,10 @@ __pycache__/
 .claude/
 docs/e2e-run.log
 docs/vite.log
+video/node_modules/
+video/frames/
+video/clips/
+video/audio/
+video/out/
+video/*.log
+video/clips/
