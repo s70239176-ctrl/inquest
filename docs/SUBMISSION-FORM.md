@@ -28,14 +28,16 @@ Character counts are checked against the form's limits.
 
 ## 05 How-to (the exact path)
 
-1. **Open the app.** Go to https://inquest-repro.vercel.app/ and click **Use demo account** (top right). No wallet is needed.
-2. **Create a bounty.** Click **Create**, then **Fill with an example**, then **Continue** twice, then **Lock pool and create bounty**, then confirm in the dialog. Wait about 30 seconds for "Bounty created." and open it from the success panel.
-3. **Switch to a researcher.** Open the account menu (top right) and choose **Reset demo account**, then click **Use demo account** again to get a fresh account.
-4. **File a report.** Open your new bounty, then the **Submitted writeups** tab. Paste `https://raw.githubusercontent.com/s70239176-ctrl/inquest/main/fixtures/tinyparse/01-high-heap-overflow.md` and click **Submit with 0.01 GEN bond**.
-5. **Run the jury.** When the claim appears as *Under review*, click **Resolve**. The validators fetch the page and vote; allow up to about two minutes.
-6. **Inspect the result.** Click **Open claim** to see the five fields and the settlement timeline. On the bounty's **Jury review** tab, click **Load validator votes** to see each validator's vote.
+Each item is one step: heading (optional) then instruction.
 
-(Shortcut: https://inquest-repro.vercel.app/#/b/1/jury already shows a real, finalized claim with the validators' votes.)
+1. **Open the app.** Go to https://inquest-repro.vercel.app/ and click **Use demo account** (top right). No wallet is needed.
+2. **Create a bounty.** Click **Create**, then **Fill with an example**, then **Continue** twice. Click **Lock pool and create bounty** and confirm in the dialog. Wait about 30 seconds for "Bounty created", then click **Open your bounty**.
+3. **Become a researcher.** Open the account menu (top right), choose **Reset demo account**, then click **Use demo account** again. This gives you a fresh account, because a project can't file a report on its own bounty.
+4. **File a report.** Go back to your bounty (**Bounties**, then open it), open the **Submitted writeups** tab and paste `https://raw.githubusercontent.com/s70239176-ctrl/inquest/main/fixtures/tinyparse/01-high-heap-overflow.md`. Click **Submit with 0.01 GEN bond**. The claim appears as *Under review*.
+5. **Run the jury.** Click **Resolve** on the claim. The validators each fetch the page and vote. Allow up to about two minutes.
+6. **Inspect the verdict.** Click the claim number to see the five fields and the settlement timeline. Then open the bounty's **Jury review** tab and click **Load validator votes** to see each validator's vote.
+
+Shortcut (optional): https://inquest-repro.vercel.app/#/b/1/jury opens a real, already-finalized claim with the validators' votes.
 
 ## 06 Review verification
 
