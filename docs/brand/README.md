@@ -24,7 +24,7 @@ The favicon is **optically sized**: its stem, dot and bob are heavier than in th
 
 ## Lockup
 
-Mark plus the wordmark **Inquest**, set in Instrument Serif regular, natural case, tracking -1%. At a 28px mark the wordmark is 27px with a 10px gap. The editorial serif is the identity's second signature; the monospaced eyebrow text (`THE ON-CHAIN BUG BOUNTY PROTOCOL`) is the third.
+Mark plus the wordmark **INQUEST**, set in bold capitals (Inter semibold, uppercase) with wide tracking (0.22em). At a 28px mark the wordmark is 15px with a 10px gap. The editorial serif (Instrument Serif) is reserved for headlines; the monospaced eyebrow text (`THE ON-CHAIN BUG BOUNTY PROTOCOL`) is the third signature.
 
 ## Colour
 

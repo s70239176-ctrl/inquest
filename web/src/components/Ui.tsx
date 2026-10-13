@@ -18,12 +18,12 @@ export function Logo({ size = 22, tone = "reverse" }: { size?: number; tone?: "i
   );
 }
 
-/** Mark plus wordmark. The wordmark is set in the editorial serif, in natural case. */
+/** Mark plus wordmark. The wordmark is bold, uppercase and widely tracked, as in the original header. */
 export function Brand({ tone, size = 28 }: { tone: "ink" | "reverse"; size?: number }) {
   return (
     <span className="inline-flex items-center gap-2.5">
       <Logo size={size} tone={tone} />
-      <span className="font-serif text-[27px] leading-none tracking-[-0.01em]">Inquest</span>
+      <span className="text-[15px] font-semibold uppercase leading-none tracking-[0.22em]">Inquest</span>
     </span>
   );
 }
