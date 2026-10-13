@@ -71,7 +71,7 @@ export function BountyPage({ id }: { id: number }) {
         <Chip value={status} />
       </div>
 
-      <div className="grid" style={{ marginTop: 12 }}>
+      <div className="stat-grid" style={{ marginTop: 12 }}>
         <Stat k="Pool remaining" v={`${formatGen(b.pool)}`} s="GEN" />
         <Stat k="Claim bond" v={formatGen(b.bond, 6)} s="GEN, returned unless slashed" />
         <Stat k="Closes" v={timeLeft(b.deadline, now)} s={formatDate(b.deadline)} />
@@ -90,7 +90,7 @@ export function BountyPage({ id }: { id: number }) {
       </div>
 
       <h2>What it pays</h2>
-      <div className="grid">
+      <div className="stat-grid">
         <Stat k="High" v={formatGen(b.highPayout)} s="GEN" />
         <Stat k="Medium" v={formatGen(b.mediumPayout)} s="GEN" />
         <Stat k="Low" v={formatGen(b.lowPayout)} s="GEN" />
@@ -166,7 +166,7 @@ export function BountyPage({ id }: { id: number }) {
       {claims.loading && !claims.data && <Skeleton rows={3} />}
       {claims.data && claims.data.items.length === 0 && <Empty>No claims yet.</Empty>}
       {claims.data && claims.data.items.length > 0 && (
-        <div className="table">
+        <div className="tbl">
           <table>
             <thead>
               <tr>

@@ -9,7 +9,10 @@ There is no admin key, no moderator, no backend model and no oracle. GenLayer is
 > **Inquest does not run exploits and does not certify that software is secure.** It reads one public writeup. It never executes a proof of concept, never follows links found inside a writeup, and never sends traffic to a target. It is not legal advice, a security warranty, or permission to attack anything.
 
 <p align="center">
-  <img src="docs/screens/claim.jpg" alt="A claim page: the jury's five fields, then the settlement timeline showing the verdict finalized and GEN moved" width="520">
+  <img src="docs/screens/home.jpg" alt="Inquest home: editorial hero with live protocol metrics and a dark panel of open bounties" width="640">
+</p>
+<p align="center">
+  <img src="docs/screens/claim.jpg" alt="A claim page: the jury's five fields, then the settlement timeline showing the verdict finalized and GEN moved" width="640">
 </p>
 
 ## Why this needs GenLayer

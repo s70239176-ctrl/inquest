@@ -173,7 +173,7 @@ export function ClaimPage({ id }: { id: number }) {
           </li>
         </ol>
         {resolved && (
-          <div className="grid" style={{ marginTop: 6 }}>
+          <div className="stat-grid" style={{ marginTop: 6 }}>
             <Stat k="Payout" v={`${formatGen(c.payout)}`} s="GEN" />
             <Stat k="Bond" v={c.bondOutcome === "RETURNED" ? "returned" : c.bondOutcome === "SLASHED" ? "slashed" : "—"} />
             <Stat k="Resolve tx" v={hash ? <Copy text={hash} label={shortAddr(hash)} /> : "unknown here"} s={settle.data ?? undefined} />

@@ -50,7 +50,7 @@ export function Mine() {
         </Empty>
       )}
       {mine.length > 0 && (
-        <div className="table">
+        <div className="tbl">
           <table>
             <thead>
               <tr>
@@ -90,7 +90,7 @@ export function Mine() {
       {claims.loading && !claims.data && <Skeleton rows={2} />}
       {claims.data && claims.data.items.length === 0 && <Empty>No claims yet. Pick a bounty and submit a writeup.</Empty>}
       {claims.data && claims.data.items.length > 0 && (
-        <div className="table">
+        <div className="tbl">
           <table>
             <thead>
               <tr>

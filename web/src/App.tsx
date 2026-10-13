@@ -9,9 +9,8 @@ import {
   loadSandbox,
   type Signer,
 } from "./lib/signer.ts";
-import { NETWORK, describeError, hasContract } from "./lib/chain.ts";
-import { shortAddr } from "./lib/format.ts";
-import { Copy, Logo } from "./components/Ui.tsx";
+import { describeError, hasContract } from "./lib/chain.ts";
+import { Navbar } from "./components/Navbar.tsx";
 import { Bounties } from "./screens/Bounties.tsx";
 import { Create } from "./screens/Create.tsx";
 import { BountyPage } from "./screens/BountyPage.tsx";
@@ -85,51 +84,9 @@ export function App() {
   else if (section === "c" && parts[1]) page = <ClaimPage id={Number(parts[1])} />;
   else if (section === "mine") page = <Mine />;
 
-  const link = (to: string, label: string, on: boolean) => (
-    <a href={to} className={on ? "on" : ""} aria-current={on ? "page" : undefined}>
-      {label}
-    </a>
-  );
-
   return (
     <Ctx.Provider value={session}>
-      <header className="topbar">
-        <div className="in">
-          <a className="brand" href="#/">
-            <Logo />
-            Inquest
-          </a>
-          <nav aria-label="Main">
-            {link("#/", "Bounties", section === "" || section === "b" || section === "c")}
-            {link("#/create", "Create", section === "create")}
-            {link("#/mine", "Mine", section === "mine")}
-          </nav>
-          <span className="spacer" />
-          <span className="net" title="Network">
-            <i /> {NETWORK}
-          </span>
-          {signer ? (
-            <span className="acct">
-              <span className="mono muted" title={signer.address}>
-                {signer.kind === "sandbox" ? "demo " : ""}
-                <Copy text={signer.address} label={shortAddr(signer.address)} />
-              </span>
-              <button className="ghost small" onClick={disconnect}>
-                {signer.kind === "sandbox" ? "Reset" : "Disconnect"}
-              </button>
-            </span>
-          ) : (
-            <span className="acct">
-              <button className="small" onClick={doConnect}>
-                Connect wallet
-              </button>
-              <button className="ghost small" onClick={useDemoAccount}>
-                Use demo account
-              </button>
-            </span>
-          )}
-        </div>
-      </header>
+      <Navbar active={section === "create" ? "create" : section === "mine" ? "mine" : "home"} />
       <main className="wrap">
         {error && (
           <div className="tx err" role="alert">
