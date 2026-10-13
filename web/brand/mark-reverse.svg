@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Inquest">
+  <polygon points="32.00,4.00 56.25,18.00 56.25,46.00 32.00,60.00 7.75,46.00 7.75,18.00" fill="none" stroke="#F1F0EA" stroke-width="3.4" stroke-linejoin="round"/>
+  <circle cx="32" cy="15.9" r="3.5" fill="#D6A844"/>
+  <rect x="30" y="22.2" width="4" height="12.6" fill="#F1F0EA"/>
+  <path d="M32 34.2 40.8 43 32 51.8 23.2 43Z" fill="#D6A844"/>
+</svg>

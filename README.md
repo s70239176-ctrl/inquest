@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="web/brand/favicon.svg" width="76" alt="Inquest: a hexagon holding a lowercase i whose stem ends in a plumb bob">
+</p>
+
 # Inquest
 
 **A bug isn't real until it repros.**

@@ -1,0 +1,23 @@
+{
+  "name": "Inquest",
+  "short_name": "Inquest",
+  "description": "A bug bounty that pays only when independent validators agree a public writeup proves an in-scope, non-duplicate bug.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#090A09",
+  "theme_color": "#090A09",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

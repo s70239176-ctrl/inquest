@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Inquest</title>
+  <polygon points="32.00,2.50 57.55,17.25 57.55,46.75 32.00,61.50 6.45,46.75 6.45,17.25" fill="#D6A844" stroke="#D6A844" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="32" cy="15.4" r="4.3" fill="#0B0C0A"/>
+  <rect x="29.5" y="22.4" width="5" height="12" fill="#0B0C0A"/>
+  <path d="M32 33.4 42.2 43.6 32 53.8 21.8 43.6Z" fill="#0B0C0A"/>
+</svg>

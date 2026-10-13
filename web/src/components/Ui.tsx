@@ -2,12 +2,29 @@ import { useState, type ReactNode } from "react";
 import type { TxState } from "../hooks.ts";
 import { shortAddr } from "../lib/format.ts";
 
-export function Logo({ size = 22 }: { size?: number }) {
+/**
+ * The Inquest mark: a hexagon (the six-validator jury) around a lowercase i whose stem runs into a plumb bob, the
+ * instrument for checking what is truly vertical. `ink` is for light surfaces, `reverse` for dark ones.
+ */
+export function Logo({ size = 22, tone = "reverse" }: { size?: number; tone?: "ink" | "reverse" }) {
+  const line = tone === "ink" ? "#171713" : "#F1F0EA";
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect width="24" height="24" rx="5" fill="#D6A844" />
-      <path d="M7 12.6l3.3 3.3L17 8.8" stroke="#171713" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true" focusable="false">
+      <polygon points="32.00,4.00 56.25,18.00 56.25,46.00 32.00,60.00 7.75,46.00 7.75,18.00" stroke={line} strokeWidth="3.4" strokeLinejoin="round" />
+      <circle cx="32" cy="15.9" r="3.5" fill="#D6A844" />
+      <rect x="30" y="22.2" width="4" height="12.6" fill={line} />
+      <path d="M32 34.2 40.8 43 32 51.8 23.2 43Z" fill="#D6A844" />
     </svg>
+  );
+}
+
+/** Mark plus wordmark. The wordmark is set in the editorial serif, in natural case. */
+export function Brand({ tone, size = 28 }: { tone: "ink" | "reverse"; size?: number }) {
+  return (
+    <span className="inline-flex items-center gap-2.5">
+      <Logo size={size} tone={tone} />
+      <span className="font-serif text-[27px] leading-none tracking-[-0.01em]">Inquest</span>
+    </span>
   );
 }
 

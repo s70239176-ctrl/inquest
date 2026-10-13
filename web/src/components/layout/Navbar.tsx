@@ -3,7 +3,7 @@ import { Check, ChevronDown, Copy as CopyIcon, LogOut, Menu, User, Wallet, X } f
 import { NETWORK } from "../../lib/chain.ts";
 import { shortAddr } from "../../lib/format.ts";
 import { useSession } from "../../wallet-context.ts";
-import { Logo } from "../Ui.tsx";
+import { Brand } from "../Ui.tsx";
 
 export type Section = "home" | "bounties" | "create" | "mine";
 export type Tone = "ivory" | "dark";
@@ -135,8 +135,7 @@ export function Navbar({ active, tone }: { active: Section; tone: Tone }) {
     <header className={`sticky top-0 z-30 border-b backdrop-blur ${c.bar}`}>
       <div className="mx-auto grid max-w-page grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-3">
         <a href="#/" className={`flex items-center gap-2.5 no-underline hover:no-underline ${c.mark} !text-current`} aria-label="Inquest home">
-          <Logo size={26} />
-          <span className="text-[15px] font-semibold uppercase tracking-[0.22em]">Inquest</span>
+          <Brand tone={tone === "ivory" ? "ink" : "reverse"} />
         </a>
 
         <nav className="hidden items-center justify-center gap-1 md:flex" aria-label="Main">
