@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { describeError } from "./lib/chain.ts";
+import { describeError, hasContract, listBounties } from "./lib/chain.ts";
 import type { Phase, TxOutcome } from "./lib/types.ts";
 
 export interface Loaded<T> {
@@ -66,4 +66,11 @@ export function useNow(everyMs = 30000): number {
     return () => clearInterval(t);
   }, [everyMs]);
   return now;
+}
+
+/** The newest bounties (one batched read), plus a ticking clock for "time left" labels. */
+export function useBountyFeed(limit = 20) {
+  const now = useNow();
+  const feed = useLoad(() => (hasContract ? listBounties(0, limit) : Promise.resolve(null)), [limit]);
+  return { ...feed, now };
 }

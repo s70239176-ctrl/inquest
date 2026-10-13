@@ -5,8 +5,8 @@ import { shortAddr } from "../lib/format.ts";
 export function Logo({ size = 22 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect width="24" height="24" rx="5" fill="#D97706" />
-      <path d="M7 12.6l3.3 3.3L17 8.8" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <rect width="24" height="24" rx="5" fill="#D6A844" />
+      <path d="M7 12.6l3.3 3.3L17 8.8" stroke="#171713" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

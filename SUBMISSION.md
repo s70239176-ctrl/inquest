@@ -32,7 +32,7 @@ Bug bounties run on trust in a reviewer. Researchers fear an arbitrary "duplicat
 | --- | --- |
 | Contract | `genvm-lint` passes; 108 Direct Mode tests (spec cases 1-14 plus refusals, refunds, page-text handling, views) |
 | Live, Studionet | `web/e2e/live.mjs`: real validators, real fetches of public fixtures, GEN verified via the contract balance. Full report with transaction hashes: [docs/E2E-REPORT.md](docs/E2E-REPORT.md) |
-| Web | typecheck, 13 unit tests, production build; driven end to end in a browser against live Studionet (create, submit, resolve, finalized settlement) with the built-in demo account |
+| Web | typecheck, 21 unit tests, production build; driven end to end in a browser against live Studionet (create, submit, resolve, finalized settlement) with the built-in demo account |
 
 ## Honest limits
 

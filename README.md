@@ -8,12 +8,14 @@ There is no admin key, no moderator, no backend model and no oracle. GenLayer is
 
 > **Inquest does not run exploits and does not certify that software is secure.** It reads one public writeup. It never executes a proof of concept, never follows links found inside a writeup, and never sends traffic to a target. It is not legal advice, a security warranty, or permission to attack anything.
 
-<p align="center">
-  <img src="docs/screens/home.jpg" alt="Inquest home: editorial hero with live protocol metrics and a dark panel of open bounties" width="640">
-</p>
-<p align="center">
-  <img src="docs/screens/claim.jpg" alt="A claim page: the jury's five fields, then the settlement timeline showing the verdict finalized and GEN moved" width="640">
-</p>
+<table>
+  <tr>
+    <td width="25%"><img src="docs/screens/home.jpg" alt="Editorial homepage on ivory: serif headline, deep-gold emphasis on True security" /></td>
+    <td width="25%"><img src="docs/screens/hero-art.jpg" alt="Hero illustration: dark mountains under a fine gold geometric structure" /></td>
+    <td width="25%"><img src="docs/screens/latest-bounties.jpg" alt="The dark application surface: searchable, filterable bounty list" /></td>
+    <td width="25%"><img src="docs/screens/jury-review.jpg" alt="Jury review tab: submitted evidence, live validator votes, recorded verdict" /></td>
+  </tr>
+</table>
 
 ## Why this needs GenLayer
 
@@ -45,6 +47,21 @@ The only judgment:
 
 Validators accept the leader **only when all five normalized fields equal their own independently fetched result**. Prose is never compared. The judge reads only the frozen rubric, the submitted URL, and up to 8 earlier accepted claim URLs on the same bounty.
 
+## The interface
+
+*Editorial clarity outside, technical precision inside.* The homepage is an ivory publication (Instrument Serif, a gold-deep accent, a hand-drawn SVG landscape with fine gold geometry) that hands over to a near-black protocol interface where the work happens.
+
+| Route | What it is |
+| --- | --- |
+| `#/` | Editorial homepage: hero, live figures, how it works, latest bounties, closing call to action |
+| `#/bounties` | Searchable, filterable, sortable list (table on desktop, cards on mobile) |
+| `#/b/:id` | Bounty with tabs: **Overview**, **Frozen rubric**, **Submitted writeups**, **Jury review**, **On-chain activity** (deep links: `#/b/:id/rubric`, `/writeups`, `/jury`, `/activity`) |
+| `#/c/:id` | One claim: the five fields, the settlement timeline, the protocol appeal panel |
+| `#/create` | Three steps (basic details, rubric and payouts, review and lock) with a confirmation dialog before the irreversible transaction |
+| `#/mine` | Your submissions, bounties, rewards and bonds, and activity |
+
+Every label maps to protocol state, never to a guess: *Rubric locked*, *Accepting reports*, *Jury review*, *Settled / closed*. **Jury review shows the real jury**: the evidence the researcher submitted, what each validator voted (read live from the node's consensus data), and the verdict the contract recorded are shown side by side as three different things. Nothing on the homepage is invented: the four figures are computed from the contract.
+
 ## Run it
 
 ```bash
@@ -70,7 +87,7 @@ The app signs with a browser wallet (MetaMask) or a built-in **demo account** (a
 | --- | --- | --- |
 | Contract lint | `genvm-lint` | passes |
 | Contract, Direct Mode | `tests/direct`: spec cases 1-14, refusals and refunds, page-text handling, views | **108 pass** |
-| Web | typecheck, 13 unit tests (decoding, calldata, formatting, rubric), production build | passes |
+| Web | typecheck, 21 unit tests (decoding, calldata, formatting, rubric, status mapping, search, sort), production build | passes |
 | **Live end to end** | `web/e2e/live.mjs` on Studionet, public fixtures fetched from GitHub, GEN verified through the contract balance | **44 pass, 1 skipped (platform), 0 fail**: [docs/E2E-REPORT.md](docs/E2E-REPORT.md) |
 | **Browser** | the app driven in a browser against live Studionet with the demo account: create, submit, resolve, finalized settlement | verified (see below) |
 

@@ -123,7 +123,12 @@ export async function contractBalance(): Promise<bigint> {
 // ------------------------------------------------------------------ writes
 interface RawTx {
   status?: string;
-  consensus_data?: { leader_receipt?: Array<{ mode?: string; execution_result?: string; result?: unknown }> };
+  appealed?: boolean;
+  num_of_rounds?: string | number;
+  consensus_data?: {
+    votes?: Record<string, string>;
+    leader_receipt?: Array<{ mode?: string; execution_result?: string; result?: unknown }>;
+  };
 }
 
 const DEAD_TEXT: Record<string, string> = {
@@ -164,6 +169,28 @@ export async function readTx(hash: string): Promise<RawTx | null> {
   return (await paced(() =>
     readClient().request({ method: "eth_getTransactionByHash", params: [hash] }),
   )) as RawTx | null;
+}
+
+export interface JuryView {
+  /** Transaction status: PENDING, ACCEPTED, FINALIZED, UNDETERMINED... */
+  status: string;
+  /** What each validator voted on the leader's result: agree, disagree, or idle (did not take part). */
+  votes: { validator: string; vote: string }[];
+  rounds: number;
+  appealed: boolean;
+}
+
+/** The real jury behind a resolve transaction, straight from the node's consensus data. */
+export async function readJury(hash: string): Promise<JuryView | null> {
+  const tx = await readTx(hash);
+  if (!tx) return null;
+  const raw = tx.consensus_data?.votes ?? {};
+  return {
+    status: tx.status ?? "PENDING",
+    votes: Object.entries(raw).map(([validator, vote]) => ({ validator: validator.toLowerCase(), vote: String(vote) })),
+    rounds: Number(tx.num_of_rounds ?? 1),
+    appealed: Boolean(tx.appealed),
+  };
 }
 
 /** Follow a transaction to finalization. 8 s polling keeps one client well under the RPC limit. */
