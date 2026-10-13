@@ -7,3 +7,4 @@ __pycache__/
 *.log
 .claude/
 docs/e2e-run.log
+docs/vite.log

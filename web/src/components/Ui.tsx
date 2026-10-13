@@ -13,18 +13,25 @@ export function Logo({ size = 22 }: { size?: number }) {
 
 const PHASE_TEXT = {
   signing: "Waiting for the signature…",
-  pending: "Sent. The validators are fetching the page and forming a verdict…",
-  accepted:
-    "The validators agreed. Waiting for finalization: GEN moves only when this finalizes, and the protocol appeal window is open until then.",
+  pending: "Sent. Waiting for the validators to process it…",
+  accepted: "The validators accepted it. Waiting for finalization: GEN moves only when this finalizes.",
   finalized: "Finalized.",
 } as const;
 
-export function TxStatus({ state, doneText = "Done." }: { state: TxState; doneText?: string }) {
+/** Wording for the jury round (resolve_claim): the validators fetch the page and answer the five fields. */
+const JUDGING_TEXT = {
+  ...PHASE_TEXT,
+  pending: "Sent. Each validator is fetching the page itself and forming its own verdict…",
+  accepted:
+    "The validators agreed. Waiting for finalization: GEN moves only when this finalizes, and the protocol appeal window is open until then.",
+} as const;
+
+export function TxStatus({ state, doneText = "Done.", judging = false }: { state: TxState; doneText?: string; judging?: boolean }) {
   if (state.kind === "idle") return null;
   if (state.kind === "running")
     return (
       <div className="tx" role="status">
-        {PHASE_TEXT[state.phase]} {state.detail && <span className="muted mono">[{state.detail}]</span>}
+        {(judging ? JUDGING_TEXT : PHASE_TEXT)[state.phase]} {state.detail && <span className="muted mono">[{state.detail}]</span>}
       </div>
     );
   if (state.kind === "error")

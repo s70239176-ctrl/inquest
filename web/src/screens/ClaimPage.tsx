@@ -61,7 +61,7 @@ export function ClaimPage({ id }: { id: number }) {
     }
   }
 
-  async function doAppeal(charge: bigint) {
+  async function doAppeal(charge: bigint | null) {
     if (!signer || !hash) return;
     setAppealBusy(true);
     setAppealMsg(null);
@@ -142,7 +142,7 @@ export function ClaimPage({ id }: { id: number }) {
           </div>
         </div>
       )}
-      <TxStatus state={tx.state} doneText="Verdict recorded." />
+      <TxStatus state={tx.state} doneText="Verdict recorded." judging />
 
       <h2>Settlement</h2>
       <div className="panel">
@@ -212,23 +212,36 @@ export function ClaimPage({ id }: { id: number }) {
                 The appeal window is closed: this verdict is final.
               </p>
             )}
-            {hash && info.data?.appealable && info.data.charge !== null && (
+            {hash && info.data?.appealable && (
               <>
                 <p style={{ marginTop: 0 }}>
-                  The appeal window is <b>open</b>. If you think the jury got it wrong, the protocol can re-run the round with more validators. The
-                  appeal charge is set by the protocol and is separate from the claim bond:{" "}
-                  <span className="acc mono">{formatGen(info.data.charge, 6)} GEN</span>.
+                  The appeal window is <b>open</b>. If you think the jury got it wrong, the protocol can re-run the round with more validators.{" "}
+                  {info.data.charge !== null ? (
+                    <>
+                      The appeal charge is set by the protocol and is separate from the claim bond:{" "}
+                      <span className="acc mono">{formatGen(info.data.charge, 6)} GEN</span>.
+                    </>
+                  ) : (
+                    <>This network does not quote an appeal charge; the protocol sets it and it is separate from the claim bond.</>
+                  )}
                 </p>
                 <p className="hint">Inquest has no court of its own and no text box for an argument: the protocol re-judges the same page.</p>
-                <div className="actions">
-                  {signer ? (
-                    <button disabled={appealBusy} onClick={() => doAppeal(info.data!.charge!)}>
-                      Appeal
-                    </button>
-                  ) : (
-                    <button onClick={connectWallet}>Connect wallet</button>
-                  )}
-                </div>
+                {info.data.fileable ? (
+                  <div className="actions">
+                    {signer ? (
+                      <button disabled={appealBusy} onClick={() => doAppeal(info.data!.charge)}>
+                        Appeal
+                      </button>
+                    ) : (
+                      <button onClick={connectWallet}>Connect wallet</button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="hint">
+                    This network (Studionet) does not accept appeal transactions from the browser SDK, so the button is withheld here. The
+                    appeal is filed on the protocol's consensus contract on Testnet, where this same panel shows the charge and the button.
+                  </p>
+                )}
               </>
             )}
             {appealMsg && <div className="tx">{appealMsg}</div>}

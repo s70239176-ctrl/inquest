@@ -7,6 +7,7 @@ import { createAccount, createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 import type { Bounty, Claim, Page, Phase, TxOutcome } from "./types.ts";
 import { TIME_DEPENDENT, REFUSALS, decodeRevert, plain, refusalKey, toBounty, toClaim, type Raw } from "./decode.ts";
+import { decodeReceiptResult } from "./calldata.ts";
 import { assertSignerReady, getProvider, type Signer } from "./signer.ts";
 
 export { describeError } from "./decode.ts";
@@ -134,14 +135,29 @@ const DEAD_TEXT: Record<string, string> = {
 };
 const DEAD = new Set(Object.keys(DEAD_TEXT));
 
-function leaderRevert(tx: RawTx): string | undefined {
+/**
+ * What the leader's receipt says about a finished transaction: a contract refusal (raised), or a soft refusal
+ * (payable calls return {ok:false, reason} and refund the value instead of raising), or nothing wrong.
+ */
+function leaderProblem(tx: RawTx): string | undefined {
   const receipts = tx.consensus_data?.leader_receipt;
   const leader = receipts?.find((r) => r.mode === "leader") ?? receipts?.[0];
-  if (!leader || leader.execution_result !== "ERROR") return undefined;
+  if (!leader) return undefined;
   const res = leader.result;
   const payload = typeof res === "string" ? res : (res as { payload?: string } | undefined)?.payload;
-  const text = decodeRevert(payload);
-  return text ? (REFUSALS[text] ?? text) : "The contract refused the call.";
+  if (leader.execution_result === "ERROR") {
+    const text = decodeRevert(payload);
+    return text ? (REFUSALS[text] ?? text) : "The contract refused the call.";
+  }
+  const decoded = decodeReceiptResult(payload);
+  if (decoded.kind === "return" && decoded.value && typeof decoded.value === "object" && !Array.isArray(decoded.value)) {
+    const v = decoded.value as Record<string, unknown>;
+    if (v.ok === false) {
+      const reason = String(v.reason ?? "");
+      return `${REFUSALS[reason] ?? reason} Any GEN you attached is being returned to you.`;
+    }
+  }
+  return undefined;
 }
 
 export async function readTx(hash: string): Promise<RawTx | null> {
@@ -161,7 +177,7 @@ async function follow(hash: string, onPhase?: (p: Phase, detail?: string) => voi
     onPhase?.(accepted ? "accepted" : "pending", status);
     if (DEAD.has(status)) return { hash, status, error: DEAD_TEXT[status] };
     if (status === "ACCEPTED" || status === "FINALIZED") {
-      const error = tx ? leaderRevert(tx) : undefined;
+      const error = tx ? leaderProblem(tx) : undefined;
       if (error) return { hash, status, error };
       if (status === "FINALIZED") {
         onPhase?.("finalized", status);
@@ -228,26 +244,47 @@ export async function sendTx(
 
 // ------------------------------------------------------------------ protocol appeal
 export interface AppealInfo {
+  /** The round is still inside its appeal window. */
   appealable: boolean;
+  /** The protocol's quoted charge, when this network quotes one. */
   charge: bigint | null;
+  /** This network accepts an appeal transaction from the SDK. Studionet does not (measured). */
+  fileable: boolean;
 }
 
-/** Asks the protocol, not this app, whether the round is still appealable and what it costs. */
+/**
+ * Asks the protocol, not this app, whether the round is still appealable and what it costs.
+ * Studionet's chain config has no appeals contract, so `canAppeal` and the charge quote are unavailable there; the
+ * round is then appealable exactly while its transaction is ACCEPTED and not yet FINALIZED, and no charge is quoted.
+ */
 export async function appealInfo(txHash: string): Promise<AppealInfo> {
   const client = readClient();
-  const appealable = await paced(() => client.canAppeal({ txId: txHash as Hex }));
-  if (!appealable) return { appealable: false, charge: null };
-  const charge = await paced(() =>
-    client.getAppealCharge ? client.getAppealCharge({ txId: txHash as Hex }) : client.getMinAppealBond({ txId: txHash as Hex }),
-  );
-  return { appealable: true, charge };
+  try {
+    const appealable = await paced(() => client.canAppeal({ txId: txHash as Hex }));
+    if (!appealable) return { appealable: false, charge: null, fileable: true };
+    const charge = await paced(() =>
+      client.getAppealCharge ? client.getAppealCharge({ txId: txHash as Hex }) : client.getMinAppealBond({ txId: txHash as Hex }),
+    );
+    return { appealable: true, charge, fileable: true };
+  } catch (e) {
+    if (!/not supported on this chain|missing/i.test(String((e as Error)?.message ?? e))) throw e;
+    const tx = await readTx(txHash);
+    return { appealable: tx?.status === "ACCEPTED", charge: null, fileable: false };
+  }
 }
 
-export async function appeal(signer: Signer, txHash: string, charge: bigint): Promise<string> {
+export async function appeal(signer: Signer, txHash: string, charge: bigint | null): Promise<string> {
   await assertSignerReady(signer);
   const client = writeClient(signer);
-  const out = await paced(() => client.appealTransaction({ txId: txHash as Hex, value: charge }));
-  return String(out);
+  try {
+    const out = await paced(() => client.appealTransaction({ txId: txHash as Hex, value: charge ?? 0n }));
+    return String(out);
+  } catch (e) {
+    if (/Invalid transaction data|Invalid parameters/i.test(String((e as Error)?.message ?? e))) {
+      throw new Error("This network did not accept the appeal transaction. Protocol appeals are filed on a network with the consensus contracts (Testnet).");
+    }
+    throw e;
+  }
 }
 
 // ------------------------------------------------------------------ resolve tx memory (this browser only)

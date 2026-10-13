@@ -1,6 +1,7 @@
 // Shared helpers for the deploy, smoke and e2e scripts. Run from the web/ directory (genlayer-js lives there).
 import { createAccount, createClient, generatePrivateKey } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
+import { decodeReceiptResult } from "../src/lib/calldata.ts";
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -22,7 +23,7 @@ export async function paced(fn) {
       const text = `${e?.message ?? e} ${JSON.stringify(e?.cause ?? "", (_, v) => (typeof v === "bigint" ? v.toString() : v))}`;
       const m = text.match(/retry_after_seconds\D+(\d+)/);
       if (text.includes("-32029") || m) { await sleep(((m ? Number(m[1]) : 20) + 2) * 1000); continue; }
-      if (/fetch failed|Failed to fetch|ECONNRESET|ETIMEDOUT|timed out|<html|<!DOCTYPE|Unexpected token '<'|unknown RPC error|502|503|504/i.test(text)) {
+      if (/fetch failed|Failed to fetch|ECONNRESET|ETIMEDOUT|timed out|<html|<!DOCTYPE|Unexpected token '<'|unknown RPC error|Bad Gateway|Service Unavailable|Gateway Time-out/i.test(text)) {
         await sleep((6 + i * 5) * 1000);
         continue;
       }
@@ -86,4 +87,18 @@ export async function write(client, address, functionName, args, value = 0n, wai
     }
   }
   return { hash, status: "TIMEOUT", tx: null, revert: null };
+}
+
+/** The transaction's return value decoded from the leader receipt, e.g. { ok, id, reason } or a string. */
+export function returnOf(tx) {
+  const receipts = tx?.consensus_data?.leader_receipt;
+  const leader = receipts?.find((r) => r.mode === "leader") ?? receipts?.[0];
+  const res = typeof leader?.result === "string" ? leader.result : leader?.result?.payload;
+  const out = decodeReceiptResult(res);
+  if (out.kind !== "return") return null;
+  const unwrap = (v) =>
+    typeof v === "bigint" ? Number(v) : Array.isArray(v) ? v.map(unwrap)
+    : v && typeof v === "object" && !(v instanceof Uint8Array) ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, unwrap(x)]))
+    : v;
+  return unwrap(out.value);
 }

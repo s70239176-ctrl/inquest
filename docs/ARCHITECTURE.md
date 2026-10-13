@@ -61,8 +61,13 @@ Every transfer is `emit_transfer(value, on="finalized")`. A provisional (ACCEPTE
 
 `bounties: TreeMap[u256, Bounty]`, `claims: TreeMap[u256, Claim]`, per-researcher counters, monotonic ids. No page text and no model prose is stored: only the five normalized fields, the payout and the bond outcome. Duplicate checks re-read the earlier URLs.
 
+## Refusals never strand GEN
+
+A transaction that **raises** keeps its attached GEN inside the contract on this runtime. The first live run measured it: a refused `submit_claim` left the bond behind. So the two payable methods (`create_bounty`, `submit_claim`) never raise after value is attached. Every check runs before any write; on a refusal the method returns `{ "ok": false, "id": 0, "reason": "<stable reason>" }` and emits a refund of the exact attached value with `on="finalized"`. Successful calls return `{ "ok": true, "id": <n>, "reason": "" }`. The web app decodes that return value from the leader receipt and shows the reason in plain language. Non-payable methods (`cancel`, `resolve_claim`, `withdraw`) carry no value and still raise `gl.vm.UserError` with the stable messages.
+
 ## Known platform behaviors the design accounts for
 
-- A transaction that ends in an execution error **keeps its attached GEN in the contract** on this runtime (measured). The UI therefore dry-runs payable calls (`simulateWriteContract`) and validates inputs client-side before any value leaves the account.
+- **Appeals.** On Studionet the SDK's chain config has no appeals contract: `canAppeal` and the charge quote are unsupported, and an `appealTransaction` is rejected by the node ("Invalid transaction data"; the SDK sends `submitAppeal` as a plain EVM call to the consensus address). The contract has no `appeal` method either way: appeals belong to the protocol. The claim page shows the window (round `ACCEPTED`, not yet `FINALIZED`), the quoted charge where the network quotes one, and the Appeal button only where the network accepts the transaction.
 - Studionet does not credit ordinary accounts on `emit_transfer`, so the live suite proves money movement through the contract's own balance.
 - `genlayer-js@2.0.0-rc.1` cannot read from or deploy to the live Studionet; the app pins 1.1.8 and feature-detects the newer calls.
+- The model often omits a `null` field; an absent `duplicate_of` is read as `null`. Any other missing field makes the answer invalid.

@@ -1,0 +1,510 @@
+{
+  "contract": "0x155AD9c1cA096dB361302d2019d53CF4Ebd186d3",
+  "started": "2026-10-13T00:00:30.528Z",
+  "finished": "2026-10-13T00:20:08.023Z",
+  "checks": [
+    {
+      "id": "D0",
+      "name": "contract deploys on Studionet and answers views",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "12a",
+      "name": "claim submitted before the deadline is accepted",
+      "ok": true,
+      "detail": "claim 1"
+    },
+    {
+      "id": "C1",
+      "name": "create_bounty locks the attached pool in the contract",
+      "ok": true,
+      "detail": "balance +14000"
+    },
+    {
+      "id": "C2",
+      "name": "frozen fields stored; status OPEN",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S1",
+      "name": "claim submission pays nothing and creates a PENDING claim",
+      "ok": true,
+      "detail": "bond locked +100"
+    },
+    {
+      "id": "2a",
+      "name": "in-scope high writeup is judged demonstrated/in-scope/original/high",
+      "ok": true,
+      "detail": "evidence=true demonstrated=true in_scope=true dup=null severity=high payout=10000 bond=RETURNED"
+    },
+    {
+      "id": "2b",
+      "name": "payout equals the high band and the bond is returned",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "2c",
+      "name": "NO GEN moves while the resolve tx is only ACCEPTED (provisional)",
+      "ok": true,
+      "detail": "before 24200, at accept 24200"
+    },
+    {
+      "id": "2d",
+      "name": "GEN moves on FINALIZATION: contract balance drops by payout + returned bond",
+      "ok": true,
+      "detail": "before 24200 -> after 14100 (expected 14100)"
+    },
+    {
+      "id": "2e",
+      "name": "pool decremented and the claim is recorded as accepted",
+      "ok": true,
+      "detail": "pool 4000"
+    },
+    {
+      "id": "5a",
+      "name": "a duplicate that calls itself novel is judged duplicate_of the earlier claim",
+      "ok": true,
+      "detail": "evidence=true demonstrated=true in_scope=true dup=2 severity=none payout=0 bond=RETURNED"
+    },
+    {
+      "id": "5b",
+      "name": "duplicate: no payout, bond returned",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "5c",
+      "name": "duplicate: pool unchanged",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "6a",
+      "name": "same area, different cause: not a duplicate, demonstrated and in scope",
+      "ok": true,
+      "detail": "evidence=true demonstrated=true in_scope=true dup=null severity=medium payout=3000 bond=RETURNED"
+    },
+    {
+      "id": "3a",
+      "name": "out-of-bounds READ clears the medium bar and is paid medium (not high)",
+      "ok": true,
+      "detail": "evidence=true demonstrated=true in_scope=true dup=null severity=medium payout=3000 bond=RETURNED"
+    },
+    {
+      "id": "4a",
+      "name": "real but excluded (DoS) is judged out of scope, no payout",
+      "ok": true,
+      "detail": "evidence=true demonstrated=true in_scope=false dup=null severity=none payout=0 bond=SLASHED"
+    },
+    {
+      "id": "4b",
+      "name": "out of scope: bond slashed to the project ledger",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "1a",
+      "name": "injection page: never high, never paid",
+      "ok": true,
+      "detail": "evidence=false demonstrated=false in_scope=false dup=null severity=none payout=0 bond=RETURNED"
+    },
+    {
+      "id": "1b",
+      "name": "injection page: settled by the table (not-evidence -> bond returned, or not-demonstrated -> bond slashed)",
+      "ok": true,
+      "detail": "bond=RETURNED evidence=false"
+    },
+    {
+      "id": "1c",
+      "name": "pool after A (high) and C (medium) is exactly 14000-10000-3000",
+      "ok": true,
+      "detail": "pool 1000"
+    },
+    {
+      "id": "7a",
+      "name": "dead URL: evidence_available false, fields forced empty",
+      "ok": true,
+      "detail": "evidence=false demonstrated=false in_scope=false dup=null severity=none payout=0 bond=RETURNED"
+    },
+    {
+      "id": "7b",
+      "name": "dead URL: bond returned, never slashed",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "R1",
+      "name": "a second claim while one is pending is refused with 'pending exists'",
+      "ok": true,
+      "detail": "revert=pending exists"
+    },
+    {
+      "id": "R2",
+      "name": "http:// URL refused with 'bad url'",
+      "ok": true,
+      "detail": "revert=bad url"
+    },
+    {
+      "id": "R3",
+      "name": "a refused claim returns the attached bond to the researcher (soft refusal, refunded on finalization)",
+      "ok": true,
+      "detail": "contract balance change after finalization 0"
+    },
+    {
+      "id": "R4",
+      "name": "the refused claim left no trace in the bounty (claim count unchanged)",
+      "ok": true,
+      "detail": "claim_count 7"
+    },
+    {
+      "id": "R5",
+      "name": "a refused create_bounty returns the whole pool and creates nothing",
+      "ok": true,
+      "detail": "reason=bad rubric; balance 11200 -> 11200"
+    },
+    {
+      "id": "W1",
+      "name": "withdraw before the deadline is refused ('nothing to withdraw')",
+      "ok": true,
+      "detail": "revert=nothing to withdraw"
+    },
+    {
+      "id": "X1",
+      "name": "cancel after claims exist is refused ('has claims')",
+      "ok": true,
+      "detail": "revert=has claims"
+    },
+    {
+      "id": "W2",
+      "name": "only the project can withdraw ('not project')",
+      "ok": true,
+      "detail": "revert=not project"
+    },
+    {
+      "id": "13a",
+      "name": "the round is provisional while ACCEPTED: the bond has not moved yet",
+      "ok": true,
+      "detail": "balance 21300 -> 21300 at ACCEPTED"
+    },
+    {
+      "id": "13b",
+      "name": "a protocol appeal can be filed while the round is ACCEPTED",
+      "ok": null,
+      "detail": "platform limitation, not exercised: error:Invalid parameters were provided to the RPC method. Double check you have provided the correct parameters."
+    },
+    {
+      "id": "13c",
+      "name": "after finalization the claim is resolved ONCE and the bond is paid back exactly once",
+      "ok": true,
+      "detail": "evidence=false demonstrated=false in_scope=false dup=null severity=none payout=0 bond=RETURNED; tx FINALIZED; balance 21300 -> 21200"
+    },
+    {
+      "id": "13d",
+      "name": "re-resolving a settled claim is refused and moves nothing",
+      "ok": true,
+      "detail": "revert=already resolved"
+    },
+    {
+      "id": "10a",
+      "name": "pool equal to one high payout is emptied by one high finding -> DEPLETED",
+      "ok": true,
+      "detail": "evidence=true demonstrated=true in_scope=true dup=null severity=high payout=10000 bond=RETURNED; status DEPLETED"
+    },
+    {
+      "id": "10b",
+      "name": "a new claim on a depleted bounty is refused ('not open')",
+      "ok": true,
+      "detail": "revert=not open"
+    },
+    {
+      "id": "10c",
+      "name": "slashed bond is withdrawable after depletion (ledger == bond)",
+      "ok": true,
+      "detail": "ledger 100"
+    },
+    {
+      "id": "10d",
+      "name": "withdraw pays the slashed bond to the project, on finalization",
+      "ok": true,
+      "detail": "balance 21300 -> 21200"
+    },
+    {
+      "id": "11a",
+      "name": "a stranger cannot cancel ('not project')",
+      "ok": true,
+      "detail": "revert=not project"
+    },
+    {
+      "id": "11b",
+      "name": "cancel with zero claims returns the full pool, on finalization",
+      "ok": true,
+      "detail": "balance 31200 -> 21200"
+    },
+    {
+      "id": "11c",
+      "name": "claims on a cancelled bounty are refused",
+      "ok": true,
+      "detail": "revert=not open"
+    },
+    {
+      "id": "12b",
+      "name": "submit after the deadline is refused ('too late')",
+      "ok": true,
+      "detail": "revert=too late"
+    },
+    {
+      "id": "12c",
+      "name": "withdraw with a PENDING claim is refused even after the deadline",
+      "ok": true,
+      "detail": "revert=nothing to withdraw"
+    },
+    {
+      "id": "12d",
+      "name": "after the pending claim resolves, the leftover pool is withdrawable, on finalization",
+      "ok": true,
+      "detail": "balance 21100 -> 11100"
+    },
+    {
+      "id": "ACC",
+      "name": "conservation: contract balance == sum(pool + slashed) + pending bonds",
+      "ok": true,
+      "detail": "balance 11100, pools+slashed 11100, pending bonds 0"
+    }
+  ],
+  "notes": [
+    "appeal capability on Studionet (genlayer-js 1.1.8): canAppeal => error:canAppeal not supported on this chain (missing appealsContract); getMinAppealBond => error:Appeal bond calculation not supported on this chain (missing feeManagerContract/roundsStorageContract); appealTransaction => error:Invalid parameters were provided to the RPC method. Double check you have provided the correct parameters."
+  ],
+  "txs": [
+    {
+      "label": "create_bounty(Deadline bounty)",
+      "hash": "0x0b303d9261c84a809b22e8b5de491105dc1b0cf0399f8fc560f1493c3e6dba29",
+      "status": "ACCEPTED",
+      "revert": null
+    },
+    {
+      "label": "submit_claim(report)",
+      "hash": "0x9b4a2deeb15c90444ed725fec8e9d136e5998c8a51c14bff753c33c145b8c841",
+      "status": "ACCEPTED",
+      "revert": null
+    },
+    {
+      "label": "create_bounty(Main bounty)",
+      "hash": "0xfeb47abf3e1a4b53ab5052aa9999b3ccbbf84e8f575cd5780c3f4b0da387c136",
+      "status": "ACCEPTED",
+      "revert": null
+    },
+    {
+      "label": "submit_claim(01-high-heap-overflow.md)",
+      "hash": "0x0d15fd24ff37fa131aee6eb0d5ce6171498dcad0021bc0a2696128611cbea239",
+      "status": "ACCEPTED",
+      "revert": null
+    },
+    {
+      "label": "resolve_claim #2 (attempt 1)",
+      "hash": "0x6fb4e5d7ea10bf51f562a2a6eda68f8d093663b91076cf53324262815a5b9570",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "submit_claim(03-duplicate-of-high.md)",
+      "hash": "0xad21d7c46a08f53641a7b1a13064a07bcd445c936896ad7eb5da70d4b7680b59",
+      "status": "ACCEPTED",
+      "revert": null
+    },
+    {
+      "label": "resolve_claim #3 (attempt 1)",
+      "hash": "0x200fff78c4d1f8130b9877e330379c3bb7c7978d1e478454bdf167690bd1d46e",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "submit_claim(02-medium-oob-read.md)",
+      "hash": "0xeef4ceeed3ee3ff7b8af03ea6c9286dc940d66d8c430f4bf2216c8142dd08c42",
+      "status": "ACCEPTED",
+      "revert": null
+    },
+    {
+      "label": "resolve_claim #4 (attempt 1)",
+      "hash": "0x6794ad2516f19756ffd38221151e06f9ad099feb0621640190e98107f7b8a8d6",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "submit_claim(04-out-of-scope-dos.md)",
+      "hash": "0xb427618ec0ba38661f7a9504509572fdabc24d2cf3bfcbcc56fa4bee8a687880",
+      "status": "ACCEPTED",
+      "revert": null
+    },
+    {
+      "label": "resolve_claim #5 (attempt 1)",
+      "hash": "0xec998a314b6d64acea04dc673d3137cb90b7272b036444174738255f9dacc125",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "submit_claim(05-injection.md)",
+      "hash": "0x5798e8eac7de9fa040a724b760e0eccf89bce838d1052c4c1f3cb345445e512f",
+      "status": "ACCEPTED",
+      "revert": null
+    },
+    {
+      "label": "resolve_claim #6 (attempt 1)",
+      "hash": "0xf614e6c325a0bf423da54df27e7dbb2bb4d29a8efab92070174c5c0c4e28bef4",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "submit_claim(report)",
+      "hash": "0x17856c24cdf71ec3777d89cf1896acbe2a7a9024ccfbf0e82053ea7612aa7911",
+      "status": "ACCEPTED",
+      "revert": null
+    },
+    {
+      "label": "resolve_claim #7 (attempt 1)",
+      "hash": "0x3bbbf77043501ad3ddf58e1aa2a7708f1c8215099a036b3505e3eea7df74044c",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "submit_claim(report)",
+      "hash": "0x7a43711205a894547805b4f4eae936240f48cc32b8468161d86121da8d8b9983",
+      "status": "ACCEPTED",
+      "revert": null
+    },
+    {
+      "label": "submit_claim(report)",
+      "hash": "0xb461923de12b71026750f59d9655685f8af7a8797016c92e5867eb09b1b7562a",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "resolve_claim #8 (attempt 1)",
+      "hash": "0xa0f89a205aa93dc393476fc02b3d234425709f2f0000b5dfc8d7d44e7f255c26",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "submit_claim(x)",
+      "hash": "0xed0e1383725e4a491e0d24a0dce0fd6d3e0cb6defd1a575e877a1923a76210a7",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "create_bounty(bad rubric, refused)",
+      "hash": "0x1fdb7b28ba60d1f2dff523baf38a2cf03d52e762d2c138408c58fd742945b9dc",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "withdraw(main) before deadline",
+      "hash": "0xdc25e9d5535196f6bc672e5ec4bbae0b0c92a78833fb507c4a4dd2aa8e3c0d13",
+      "status": "ACCEPTED",
+      "revert": "nothing to withdraw"
+    },
+    {
+      "label": "cancel(main) with claims",
+      "hash": "0x50a078181019860062783ebc01db53bd9a97512058812ef28c6c6f2161213f8e",
+      "status": "ACCEPTED",
+      "revert": "has claims"
+    },
+    {
+      "label": "create_bounty(Appeal bounty)",
+      "hash": "0xd5bce223cc2709dca75588eddf6250b289b3a5e1e942bff69bf8ba899d5ae03c",
+      "status": "ACCEPTED",
+      "revert": null
+    },
+    {
+      "label": "submit_claim(report)",
+      "hash": "0xa6d3b6ad616a9a92e13241e788e2964748bfe597403fa5b6885cba582f8360d8",
+      "status": "ACCEPTED",
+      "revert": null
+    },
+    {
+      "label": "resolve_claim for appeal scenario",
+      "hash": "0xcba8bf9b48e1cbbe10d6d15a56ae566d4b44103c25afdaa0843ba315041e310c",
+      "status": "ACCEPTED",
+      "revert": null
+    },
+    {
+      "label": "create_bounty(Economy bounty)",
+      "hash": "0x5cd9180b44c6ddc8f92bb9db4200ad4b08c4b1bc1bae5b487c22a39c087aa233",
+      "status": "ACCEPTED",
+      "revert": null
+    },
+    {
+      "label": "submit_claim(04-out-of-scope-dos.md)",
+      "hash": "0x6d11d288a9c0b00a4035272f88ada1292e2f159af3c1cc90f647d7458b43d6e6",
+      "status": "ACCEPTED",
+      "revert": null
+    },
+    {
+      "label": "resolve_claim #10 (attempt 1)",
+      "hash": "0x353ad27bdc8c7cad0e5aa295ac6865edbe7694f56adf2ac1c83f8e7f8faee9d3",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "submit_claim(01-high-heap-overflow.md)",
+      "hash": "0x2909dfaa802a39a38dbe95fff3222454766e78f77f988be10b26ac276b2cb8c8",
+      "status": "ACCEPTED",
+      "revert": null
+    },
+    {
+      "label": "resolve_claim #11 (attempt 1)",
+      "hash": "0xf92dd7ce557f234e9eeba1f064665dcc0c1d02f18fe87dea1f0ba6852a9fc1e2",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "submit_claim(report)",
+      "hash": "0xdcab6de4d56fbec2c10f63047306f3237365d40eff06524ae8c5d1947dfb96b9",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "withdraw(economy)",
+      "hash": "0x5920180be1b9bf53bf78fbb9b37f5317b346086e5b8cbeb7104e4947742308af",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "create_bounty(Cancel bounty)",
+      "hash": "0x0d0ca69744b339aa0c96bca85b1cd18b9807376615a02e4f24c57c0dfb2e3b55",
+      "status": "ACCEPTED",
+      "revert": null
+    },
+    {
+      "label": "cancel(no claims)",
+      "hash": "0xec550b9523d4f94c71fa60778502d15af4ba030bd949bf4de6500fd4ddbc799e",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "submit_claim(report)",
+      "hash": "0x5df1136c6185ee4313087c85c53068dc3345cd7851add83092e6e718a8ab8dce",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "submit_claim(report)",
+      "hash": "0x962cbc6e806c37a2c4f22dff4109f4a8b1363b4447b0cd7c22c3cf14f322ef1a",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "resolve_claim #1 (attempt 1)",
+      "hash": "0x9b01c900aeb0ee8b2bcd6a702a8e708962d7d656911c7f7de48140aa6c7300b7",
+      "status": "FINALIZED",
+      "revert": null
+    },
+    {
+      "label": "withdraw(deadline)",
+      "hash": "0x80e56b2c4cf48322a88a34ae7d70d80b93911f3a0b4b722752cef1409ca87d33",
+      "status": "FINALIZED",
+      "revert": null
+    }
+  ]
+}

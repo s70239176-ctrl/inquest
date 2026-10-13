@@ -359,6 +359,58 @@ class Inquest(gl.Contract):
         if amount > 0:
             gl.get_contract_at(to).emit_transfer(value=u256(amount), on="finalized")
 
+    def _refuse(self, reason: str, value: int) -> dict:
+        """
+        A refused payable call must NOT raise: a transaction that ends in an error keeps its attached GEN inside the
+        contract (measured on Studionet). Hand back the stable reason and return the exact value on finalization.
+        Nothing has been written when this runs: every check precedes every effect.
+        """
+        self._pay(self._sender(), value)
+        return {"ok": False, "id": 0, "reason": reason}
+
+    def _check_new_bounty(self, pool, title, repo_url, rubric, low_payout, medium_payout, high_payout, deadline, bond):
+        if pool < 1:
+            _fail("empty pool")
+        if not isinstance(title, str) or not (1 <= len(title.strip()) and len(title) <= MAX_TITLE):
+            _fail("bad title")
+        _validate_https_url(repo_url)
+        if not isinstance(rubric, str) or rubric.strip() == "" or len(rubric) > MAX_RUBRIC:
+            _fail("bad rubric")
+        low, med, high = int(low_payout), int(medium_payout), int(high_payout)
+        if not (high >= med >= low > 0):
+            _fail("bad payouts")
+        now = self._now()
+        if not (now < int(deadline) <= now + MAX_DEADLINE_SECONDS):
+            _fail("bad deadline")
+        bond_i = int(bond)
+        if not (low // 100 <= bond_i <= low // 2) or bond_i < 1:
+            _fail("bad bond")
+        if pool < high:
+            _fail("pool below high payout")
+        return low, med, high, bond_i, now
+
+    def _check_new_claim(self, bounty_id, url, value, who) -> Bounty:
+        b = self._bounty(bounty_id)
+        if b.status != B_OPEN:
+            _fail("not open")
+        if self._now() > int(b.deadline):
+            _fail("too late")
+        if who == b.project:
+            _fail("project cannot claim")
+        _validate_https_url(url)
+        if value != int(b.bond):
+            _fail("bond mismatch")
+        key = _key(bounty_id, who)
+        if key in self.researcher_pending and int(self.researcher_pending[key]) > 0:
+            _fail("pending exists")
+        if key in self.researcher_claims and int(self.researcher_claims[key]) >= MAX_CLAIMS_PER_RESEARCHER:
+            _fail("attempt limit")
+        if int(b.claim_count) >= MAX_CLAIMS_PER_BOUNTY:
+            _fail("claim limit")
+        if int(b.pool) < 1:
+            _fail("empty pool")
+        return b
+
     def _withdrawable(self, b: Bounty, now: int) -> int:
         if int(b.pending_count) != 0:
             return 0
@@ -421,26 +473,14 @@ class Inquest(gl.Contract):
         high_payout: u256,
         deadline: u256,
         bond: u256,
-    ) -> u256:
+    ) -> dict:
         pool = int(gl.message.value)
-        if pool < 1:
-            _fail("empty pool")
-        if not isinstance(title, str) or not (1 <= len(title.strip()) and len(title) <= MAX_TITLE):
-            _fail("bad title")
-        _validate_https_url(repo_url)
-        if not isinstance(rubric, str) or rubric.strip() == "" or len(rubric) > MAX_RUBRIC:
-            _fail("bad rubric")
-        low, med, high = int(low_payout), int(medium_payout), int(high_payout)
-        if not (high >= med >= low > 0):
-            _fail("bad payouts")
-        now = self._now()
-        if not (now < int(deadline) <= now + MAX_DEADLINE_SECONDS):
-            _fail("bad deadline")
-        bond_i = int(bond)
-        if not (low // 100 <= bond_i <= low // 2) or bond_i < 1:
-            _fail("bad bond")
-        if pool < high:
-            _fail("pool below high payout")
+        try:
+            low, med, high, bond_i, now = self._check_new_bounty(
+                pool, title, repo_url, rubric, low_payout, medium_payout, high_payout, deadline, bond
+            )
+        except gl.vm.UserError as refusal:
+            return self._refuse(str(refusal.message), pool)
 
         bounty_id = self.next_bounty_id
         self.next_bounty_id = u256(int(bounty_id) + 1)
@@ -463,7 +503,7 @@ class Inquest(gl.Contract):
             claim_count=u256(0),
             pending_count=u256(0),
         )
-        return bounty_id
+        return {"ok": True, "id": int(bounty_id), "reason": ""}
 
     @gl.public.write
     def cancel(self, bounty_id: u256) -> None:
@@ -482,27 +522,14 @@ class Inquest(gl.Contract):
         self._pay(b.project, refund)
 
     @gl.public.write.payable
-    def submit_claim(self, bounty_id: u256, url: str) -> u256:
-        b = self._bounty(bounty_id)
+    def submit_claim(self, bounty_id: u256, url: str) -> dict:
+        value = int(gl.message.value)
         who = self._sender()
-        if b.status != B_OPEN:
-            _fail("not open")
-        if self._now() > int(b.deadline):
-            _fail("too late")
-        if who == b.project:
-            _fail("project cannot claim")
-        _validate_https_url(url)
-        if int(gl.message.value) != int(b.bond):
-            _fail("bond mismatch")
+        try:
+            b = self._check_new_claim(bounty_id, url, value, who)
+        except gl.vm.UserError as refusal:
+            return self._refuse(str(refusal.message), value)
         key = _key(bounty_id, who)
-        if key in self.researcher_pending and int(self.researcher_pending[key]) > 0:
-            _fail("pending exists")
-        if key in self.researcher_claims and int(self.researcher_claims[key]) >= MAX_CLAIMS_PER_RESEARCHER:
-            _fail("attempt limit")
-        if int(b.claim_count) >= MAX_CLAIMS_PER_BOUNTY:
-            _fail("claim limit")
-        if int(b.pool) < 1:
-            _fail("empty pool")
 
         claim_id = self.next_claim_id
         self.next_claim_id = u256(int(claim_id) + 1)
@@ -529,7 +556,7 @@ class Inquest(gl.Contract):
         b.pending_count = u256(int(b.pending_count) + 1)
         self.researcher_claims[key] = u256((int(self.researcher_claims[key]) if key in self.researcher_claims else 0) + 1)
         self.researcher_pending[key] = u256(1)
-        return claim_id
+        return {"ok": True, "id": int(claim_id), "reason": ""}
 
     @gl.public.write
     def resolve_claim(self, claim_id: u256) -> str:

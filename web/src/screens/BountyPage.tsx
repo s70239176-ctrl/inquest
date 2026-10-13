@@ -15,6 +15,7 @@ export function BountyPage({ id }: { id: number }) {
   const claims = useLoad(() => listClaims(id, "", 0, 20), [id]);
   const tx = useTx();
   const [url, setUrl] = useState("");
+  const [judging, setJudging] = useState(false);
 
   const b = bounty.data;
   if (bounty.error) return <ErrorBox message={bounty.error} onRetry={bounty.reload} />;
@@ -34,6 +35,7 @@ export function BountyPage({ id }: { id: number }) {
 
   async function submitClaim() {
     if (!signer || !b) return;
+    setJudging(false);
     const out = await tx.run((onPhase) => sendTx(signer, "submit_claim", [BigInt(id), url.trim()], b.bond, onPhase));
     if (out && !out.error) {
       setUrl("");
@@ -43,12 +45,14 @@ export function BountyPage({ id }: { id: number }) {
 
   async function act(fn: "cancel" | "withdraw") {
     if (!signer) return;
+    setJudging(false);
     const out = await tx.run((onPhase) => sendTx(signer, fn, [BigInt(id)], 0n, onPhase));
     if (out && !out.error) refresh();
   }
 
   async function resolve(claimId: number) {
     if (!signer) return;
+    setJudging(true);
     const out = await tx.run((onPhase) =>
       sendTx(signer, "resolve_claim", [BigInt(claimId)], 0n, onPhase, (h) => rememberResolveTx(claimId, h)),
     );
@@ -155,7 +159,7 @@ export function BountyPage({ id }: { id: number }) {
           </div>
         </>
       )}
-      <TxStatus state={tx.state} />
+      <TxStatus state={tx.state} judging={judging} />
 
       <h2>Claims</h2>
       {claims.error && <ErrorBox message={claims.error} onRetry={claims.reload} />}

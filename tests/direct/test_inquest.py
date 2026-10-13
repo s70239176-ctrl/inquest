@@ -5,7 +5,7 @@ import pytest
 
 from conftest import (
     BOND, DAY, GOOD_PAGE, GOOD_URL, HIGH, INJECT_PAGE, INJECT_URL, LOW, MED, NOW0, POOL, RUBRIC,
-    SECOND_URL, TRAP_HOST, contract_module, hexof, judgment, judgment_json, set_clock,
+    SECOND_URL, TRAP_HOST, REPO, contract_module, hexof, judgment, judgment_json, set_clock,
 )
 
 
@@ -648,3 +648,81 @@ class TestPageText:
         prompt = self.prompt_for(world, hostile)
         assert prompt.count("SUBMITTED>>>") == 1  # only the real closing delimiter
         assert prompt.count("<<<RUBRIC") == 1 and prompt.count("RUBRIC>>>") == 1
+
+
+# ------------------------------------------------- refused payable calls never strand GEN
+class TestSoftRefusal:
+    """A transaction that raises keeps its attached value in the contract (measured on Studionet),
+    so payable calls return a stable reason and refund the exact value on finalization instead."""
+
+    def raw_submit(self, world, bid, url, value, sender=None):
+        world.vm.sender = sender or world.bob
+        world.vm.value = value
+        res = world.c.submit_claim(bid, url)
+        world.vm.value = 0
+        world.deposited += value
+        return res
+
+    def test_refused_claim_returns_the_reason_and_refunds_the_exact_bond(self, world):
+        bid = world.create()
+        res = self.raw_submit(world, bid, "http://insecure.example/x", BOND)
+        assert res == {"ok": False, "id": 0, "reason": "bad url"}
+        assert world.sent == [{"to": hexof(world.bob), "value": BOND, "on": "finalized"}]
+        b = world.c.get_bounty(bid)
+        assert b["claim_count"] == 0 and b["pending_count"] == 0 and b["claim_ids"] == []
+        conserved(world)
+
+    @pytest.mark.parametrize(
+        "url,value,reason",
+        [
+            (GOOD_URL, BOND + 1, "bond mismatch"),
+            (GOOD_URL, BOND - 1, "bond mismatch"),
+            (GOOD_URL, 0, "bond mismatch"),
+            ("https://127.0.0.1/x", BOND, "bad url"),
+        ],
+    )
+    def test_every_validation_refusal_refunds_what_was_attached(self, world, url, value, reason):
+        bid = world.create()
+        res = self.raw_submit(world, bid, url, value)
+        assert res["ok"] is False and res["reason"] == reason
+        assert world.paid_to(world.bob) == value
+        assert all(t["on"] == "finalized" for t in world.sent)
+        conserved(world)
+
+    def test_unknown_bounty_and_closed_bounty_refund(self, world):
+        res = self.raw_submit(world, 99, GOOD_URL, BOND)
+        assert res["reason"] == "unknown bounty" and world.paid_to(world.bob) == BOND
+        bid = world.create(pool=HIGH)
+        first = world.submit(bid)
+        world.resolve(first)  # depletes
+        before = world.paid_to(world.charlie)
+        res = self.raw_submit(world, bid, GOOD_URL, BOND, sender=world.charlie)
+        assert res["reason"] == "not open"
+        assert world.paid_to(world.charlie) - before == BOND
+        conserved(world)
+
+    def test_second_pending_claim_is_refused_and_refunded_without_touching_the_first(self, world):
+        bid = world.create()
+        cid = world.submit(bid)
+        res = self.raw_submit(world, bid, SECOND_URL, BOND)
+        assert res["reason"] == "pending exists" and world.paid_to(world.bob) == BOND
+        assert world.c.get_claim(cid)["status"] == "PENDING"
+        assert world.c.get_bounty(bid)["claim_count"] == 1
+        conserved(world)
+
+    def test_refused_bounty_returns_the_whole_pool_and_creates_nothing(self, world):
+        world.vm.sender = world.alice
+        world.vm.value = HIGH - 1  # below one high payout
+        res = world.c.create_bounty("t", REPO, RUBRIC, LOW, MED, HIGH, NOW0 + DAY, BOND)
+        world.vm.value = 0
+        world.deposited += HIGH - 1
+        assert res == {"ok": False, "id": 0, "reason": "pool below high payout"}
+        assert world.paid_to(world.alice) == HIGH - 1
+        assert world.c.list_bounties(0, 5)["total"] == 0
+        conserved(world)
+
+    def test_zero_value_refusal_emits_no_transfer(self, world):
+        world.vm.sender = world.alice
+        world.vm.value = 0
+        res = world.c.create_bounty("t", REPO, RUBRIC, LOW, MED, HIGH, NOW0 + DAY, BOND)
+        assert res["reason"] == "empty pool" and world.sent == []

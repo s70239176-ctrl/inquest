@@ -37,6 +37,10 @@ INJECT_PAGE = (
 )
 
 
+class Refused(Exception):
+    """A payable call the contract refused softly: it returned a stable reason and refunded the attached value."""
+
+
 def iso(offset_seconds: int = 0) -> str:
     return (T0 + timedelta(seconds=offset_seconds)).isoformat().replace("+00:00", "Z")
 
@@ -132,20 +136,24 @@ def world(direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie):
             p.update(overrides)
             direct_vm.sender = sender or direct_alice
             direct_vm.value = pool
-            bid = contract.create_bounty(p["title"], p["repo_url"], p["rubric"], p["low"], p["med"],
+            res = contract.create_bounty(p["title"], p["repo_url"], p["rubric"], p["low"], p["med"],
                                          p["high"], p["deadline"], p["bond"])
             direct_vm.value = 0
             cls.deposited += pool
-            return bid
+            if not res["ok"]:
+                raise Refused(res["reason"])
+            return res["id"]
 
         @classmethod
         def submit(cls, bid, url=GOOD_URL, sender=None, value=BOND):
             direct_vm.sender = sender or direct_bob
             direct_vm.value = value
-            cid = contract.submit_claim(bid, url)
+            res = contract.submit_claim(bid, url)
             direct_vm.value = 0
             cls.deposited += value
-            return cid
+            if not res["ok"]:
+                raise Refused(res["reason"])
+            return res["id"]
 
         @staticmethod
         def reset_mocks():
