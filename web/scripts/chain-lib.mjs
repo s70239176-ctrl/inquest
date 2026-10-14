@@ -1,12 +1,16 @@
 // Shared helpers for the deploy, smoke and e2e scripts. Run from the web/ directory (genlayer-js lives there).
 import { createAccount, createClient, generatePrivateKey } from "genlayer-js";
-import { studionet } from "genlayer-js/chains";
+import * as chains from "genlayer-js/chains";
 import { decodeReceiptResult } from "../src/lib/calldata.ts";
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** INQUEST_CHAIN selects the network: studionet (default), testnetBradbury or testnetAsimov. */
+export const chain = chains[process.env.INQUEST_CHAIN ?? "studionet"];
+if (!chain) throw new Error("unknown INQUEST_CHAIN " + process.env.INQUEST_CHAIN);
+
 export function clientFor(key) {
-  return createClient({ chain: studionet, account: key ? createAccount(key) : undefined });
+  return createClient({ chain, account: key ? createAccount(key) : undefined });
 }
 export const freshKey = () => generatePrivateKey();
 export const addressOf = (key) => createAccount(key).address;

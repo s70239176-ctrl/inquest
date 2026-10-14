@@ -2,9 +2,9 @@
 // screen, and which real screen of the live app illustrates each moment. ~200 words of narration, sized for ~90 seconds.
 
 export const BASE = process.env.INQUEST_URL ?? "https://inquest-repro.vercel.app";
-export const CONTRACT = "0x87664D7a67991E117F02507048c14C69D30bC6E4";
+export const CONTRACT = "0xb65Ff1E3F4DDE55fF56d3A5ee98f51aDB7944630";
 // The real resolve transaction behind claim #1 on that contract (used to load the validators' votes in a clean browser)
-export const RESOLVE_TX_CLAIM_1 = "0x7ab979d9267418900f222df75256f3ad8cf661af9512b366fc532bffc0063efe";
+export const RESOLVE_TX_CLAIM_1 = "0xd0d3a795718d68f9f4299857aae745e199aa750848fb62aa0a906dbe50d18231";
 
 export const TARGET_SECONDS = 90;
 
