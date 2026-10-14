@@ -74,7 +74,7 @@ What is **not** demonstrated: a network other than Studionet. `wallet-delivery.m
 | Finalized consensus results | every settling transaction is waited to `FINALIZED`; votes are recorded in the report notes |
 | Source-integrity evidence | `evidence_hash`, `evidence_state`, `note` on every claim; shown in the claim page and jury card |
 | Recipient-wallet payment verification | ordinary accounts on Studionet: 5/5 delivered (section 1); other networks not run |
-| **Complete MetaMask-driven transactions** | **Not performed.** The build tooling cannot operate a browser-extension wallet, and the live suites sign with throwaway keys. The app's wallet path shares `sendTx` with the demo-account path but has not been driven by MetaMask here. [docs/METAMASK-CHECKLIST.md](METAMASK-CHECKLIST.md) is a ten-step walkthrough, with what to record at each step, for someone with MetaMask to run. |
+| **Complete MetaMask-driven transactions** | **Run by the project owner with a real MetaMask, who reported that it works.** The build tooling could not operate the wallet, so the steps and results were not observed by the tooling and no transaction hashes or screenshots are recorded in this repository yet. [docs/METAMASK-CHECKLIST.md](METAMASK-CHECKLIST.md) is the ten-step walkthrough; attach the hashes and balances it asks for before sending this to a reviewer. |
 
 ## Other things that remain true
 

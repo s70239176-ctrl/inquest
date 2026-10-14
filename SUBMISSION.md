@@ -44,7 +44,7 @@ Bug bounties run on trust in a reviewer. Researchers fear an arbitrary "duplicat
 
 ## Honest limits
 
-- **Only Studionet was tested for wallet delivery.** Rewards, bond refunds, cancellations and withdrawals each reached an ordinary account's own balance there (5/5, `web/e2e/wallet-delivery.mjs`); a testnet was not run. **MetaMask-driven transactions were not performed** ([docs/METAMASK-CHECKLIST.md](docs/METAMASK-CHECKLIST.md)).
+- **Only Studionet was tested for wallet delivery.** Rewards, bond refunds, cancellations and withdrawals each reached an ordinary account's own balance there (5/5, `web/e2e/wallet-delivery.mjs`); a testnet was not run. **MetaMask-driven transactions were run by the project owner, who reports they work** (no hashes recorded yet; [docs/METAMASK-CHECKLIST.md](docs/METAMASK-CHECKLIST.md)).
 - **Protocol appeals cannot be filed on Studionet from the browser SDK** (no appeals contract in its chain config, and the node rejects `submitAppeal`). The UI shows the appeal window and withholds the button there; the same panel shows the charge and the button where the network supports it. The live suite records this as a skipped, platform-limited check. Re-execution safety is covered by the finalization-only transfers, the idempotent `resolve_claim`, and an offline snapshot/revert test.
 - Requiring all five fields to match means long or borderline writeups often end UNDETERMINED (nothing moves; resolve again). That is the intended fail-safe, at a cost in liveness.
 - Studionet only; `genlayer-js` 1.1.8 is pinned because the 2.0 release candidate cannot read from or deploy to the live Studionet.

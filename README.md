@@ -140,7 +140,7 @@ The live suite is not mocked: it deploys a fresh contract, validators fetch the 
 - **Wallet delivery on a testnet.** Delivery to ordinary accounts is shown on Studionet only (5/5). `wallet-delivery.mjs` takes `INQUEST_CHAIN=testnetBradbury` and funded keys but has not been run there.
 - **The failed-payment callback on a live network.** Studionet never fires `__on_errored_message__`; recovery is tested by simulating the callback offline.
 - **A protocol appeal.** Studionet cannot take one from the SDK: its chain config has no appeals contract (`canAppeal` and the charge quote are unsupported) and the node rejects `submitAppeal` ("Invalid transaction data"). The live suite records this as a skipped check with the measured errors. The contract has no `appeal` method; re-execution safety is covered by finalization-only transfers, the idempotent `resolve_claim`, and an offline snapshot/revert test. The Appeal button is untested against a network that accepts it.
-- **A browser wallet** (MetaMask). The wallet path shares the same client code as the demo account but was not driven; [docs/METAMASK-CHECKLIST.md](docs/METAMASK-CHECKLIST.md) is a walkthrough for someone with a wallet.
+- **MetaMask evidence.** The owner ran the walkthrough in [docs/METAMASK-CHECKLIST.md](docs/METAMASK-CHECKLIST.md) with a real MetaMask and reports it works; the tooling did not observe it and no hashes are recorded here yet.
 - **Mobile layout** was checked at pane width only.
 
 ## Repository layout
