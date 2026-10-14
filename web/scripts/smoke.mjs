@@ -2,6 +2,7 @@
 // Usage (from web/):  node scripts/smoke.mjs <contract-address>
 // Uses throwaway keys and tiny wei amounts. Writeups are deliberately NOT real bug reports.
 import { clientFor, freshKey, paced, view, write } from "./chain-lib.mjs";
+import { contentHash, fingerprintUrl } from "../src/lib/fingerprint.ts";
 
 const address = process.argv[2] ?? process.env.VITE_CONTRACT_ADDRESS;
 if (!/^0x[0-9a-fA-F]{40}$/.test(address ?? "")) throw new Error("usage: node scripts/smoke.mjs <contract-address>");
@@ -32,12 +33,12 @@ const list = await view(project, address, "list_bounties", [0n, 20n]);
 const bountyId = BigInt(list.items[0].id);
 console.log("bounty", bountyId.toString(), "pool", list.items[0].pool.toString(), "status", list.items[0].status, bounty ? "" : "(get_bounty(1) missing: not the first bounty on this contract)");
 
-const sub1 = await write(alice, address, "submit_claim", [bountyId, "https://example.com/"], 100n);
+const sub1 = await write(alice, address, "submit_claim", [bountyId, "https://example.com/", (await fingerprintUrl("https://example.com/")).hash], 100n);
 show("submit_claim(example.com)", sub1);
-const sub2 = await write(bob, address, "submit_claim", [bountyId, "https://this-host-does-not-exist.invalid-inquest.example/report"], 100n);
+const sub2 = await write(bob, address, "submit_claim", [bountyId, "https://this-host-does-not-exist.invalid-inquest.example/report", await contentHash("unreachable")], 100n);
 show("submit_claim(dead url)", sub2);
 
-const sub3 = await write(carol, address, "submit_claim", [bountyId, "https://blog.cloudflare.com/answering-the-critical-question-can-you-get-private-ssl-keys-using-heartbleed/"], 100n);
+const sub3 = await write(carol, address, "submit_claim", [bountyId, "https://blog.cloudflare.com/answering-the-critical-question-can-you-get-private-ssl-keys-using-heartbleed/", (await fingerprintUrl("https://blog.cloudflare.com/answering-the-critical-question-can-you-get-private-ssl-keys-using-heartbleed/")).hash], 100n);
 show("submit_claim(heartbleed writeup)", sub3);
 
 const claims = await view(project, address, "list_claims", [bountyId, "", 0n, 20n]);

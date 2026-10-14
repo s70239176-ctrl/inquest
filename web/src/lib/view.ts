@@ -103,8 +103,14 @@ export interface Standing {
  * so "Accepted" means the jury accepted it and the payout is scheduled, not that GEN has already moved.
  */
 export function claimStanding(c: Claim): Standing {
-  if (c.status === "PENDING") return { label: "Under review", tone: "amber" };
+  if (c.status === "EXPIRED") return { label: "Expired", tone: "gray" };
+  if (c.status === "PENDING") {
+    return c.attempts > 0 ? { label: "Page unreachable, retrying", tone: "amber" } : { label: "Under review", tone: "amber" };
+  }
   if (c.payout > 0n) return { label: "Accepted", tone: "green" };
+  if (c.evidenceState === "withdrawn") return { label: "Evidence withdrawn", tone: "red" };
+  if (c.evidenceState === "changed") return { label: "Evidence changed", tone: "red" };
+  if (c.note === "bounty_full") return { label: "Bounty full", tone: "gray" };
   if (c.bondOutcome === "SLASHED") return { label: "Rejected", tone: "red" };
   if (c.evidenceAvailable === false) return { label: "No evidence", tone: "gray" };
   if (c.duplicateOf !== null) return { label: "Duplicate", tone: "gray" };
@@ -147,4 +153,18 @@ export function protocolStats(items: Bounty[], total: number, now: number): Stat
     claimsJudged: items.reduce((a, b) => a + (b.claimCount - b.pendingCount), 0),
     gen: items.reduce((a, b) => a + b.pool, 0n),
   };
+}
+
+export type QueueState = "head" | "waiting" | "retry-wait" | "expirable" | "done";
+
+/**
+ * Where a claim stands in its bounty's queue. Only the head (oldest pending) claim can be judged; a claim whose page was
+ * unreachable must wait out the retry gap; any claim past its window can be expired by anyone.
+ */
+export function queueState(c: Claim, headClaimId: number, retryGap: number, now: number): { state: QueueState; waitSeconds: number } {
+  if (c.status !== "PENDING") return { state: "done", waitSeconds: 0 };
+  if (c.expiresAt > 0 && now >= c.expiresAt) return { state: "expirable", waitSeconds: 0 };
+  if (c.id !== headClaimId) return { state: "waiting", waitSeconds: 0 };
+  const wait = c.attempts > 0 ? c.lastAttemptAt + retryGap - now : 0;
+  return wait > 0 ? { state: "retry-wait", waitSeconds: wait } : { state: "head", waitSeconds: 0 };
 }

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { bountyPhase, claimStanding, claimTotals, matchesStatus, protocolStats, scopeExcerpt, searchBounties, sortBounties } from "./view.ts";
+import { bountyPhase, claimStanding, claimTotals, matchesStatus, protocolStats, queueState, scopeExcerpt, searchBounties, sortBounties } from "./view.ts";
 import type { Bounty, Claim } from "./types.ts";
 
 const NOW = 1_800_000_000;
@@ -8,11 +8,11 @@ const bounty = (o: Partial<Bounty> = {}): Bounty => ({
   id: 1, project: "0xabc", title: "tinyparse bounty", repoUrl: "https://github.com/acme/tinyparse",
   rubric: "In scope: memory-safety bugs in the parser.\n\nOut of scope: denial of service.\n\nDuplicates: same cause.\n\nSeverity bars: low = crash.",
   lowPayout: 1n, mediumPayout: 3n, highPayout: 10n, bond: 1n, deadline: NOW + 86400, createdAt: NOW - 100, status: "OPEN",
-  pool: 100n, slashed: 0n, claimIds: [], acceptedIds: [], claimCount: 0, pendingCount: 0, withdrawable: 0n, ...o,
+  pool: 100n, slashed: 0n, reserved: 0n, headClaimId: 0, claimIds: [], acceptedIds: [], claimCount: 0, pendingCount: 0, withdrawable: 0n, ...o,
 });
 const claim = (o: Partial<Claim> = {}): Claim => ({
-  id: 1, bountyId: 1, researcher: "0xr", url: "https://a.b/c", bond: 5n, status: "RESOLVED", evidenceAvailable: true,
-  demonstrated: true, inScope: true, duplicateOf: null, severity: "high", payout: 10n, bondOutcome: "RETURNED", createdAt: 1, resolvedAt: 2, ...o,
+  id: 1, bountyId: 1, researcher: "0xr", url: "https://a.b/c", evidenceHash: "a".repeat(64), bond: 5n, status: "RESOLVED", evidenceAvailable: true,
+  demonstrated: true, inScope: true, duplicateOf: null, severity: "high", payout: 10n, bondOutcome: "RETURNED", evidenceState: "ok", note: "", attempts: 0, lastAttemptAt: 0, expiresAt: 1_000_000, createdAt: 1, resolvedAt: 2, ...o,
 });
 
 test("bounty phases come from contract fields only", () => {
@@ -97,4 +97,27 @@ test("protocol stats are computed from real bounty fields", () => {
     NOW,
   );
   assert.deepEqual(s, { totalBounties: 9, acceptingBounties: 1, claimsTotal: 5, claimsJudged: 4, gen: 105n });
+});
+
+test("v2 standings: expired, changed, withdrawn, retrying and bounty-full are named for what happened", () => {
+  assert.equal(claimStanding(claim({ status: "EXPIRED", payout: 0n, bondOutcome: "RETURNED", evidenceState: "expired", note: "expired" })).label, "Expired");
+  assert.equal(claimStanding(claim({ status: "PENDING", attempts: 1, payout: 0n, bondOutcome: "NONE" })).label, "Page unreachable, retrying");
+  assert.equal(claimStanding(claim({ payout: 0n, bondOutcome: "SLASHED", evidenceState: "changed", note: "evidence_changed" })).label, "Evidence changed");
+  assert.equal(claimStanding(claim({ payout: 0n, bondOutcome: "SLASHED", evidenceState: "withdrawn", note: "evidence_withdrawn" })).label, "Evidence withdrawn");
+  assert.equal(claimStanding(claim({ payout: 0n, note: "bounty_full" })).label, "Bounty full");
+  // a genuine rejection is still "Rejected", distinct from a changed or withdrawn page
+  assert.equal(claimStanding(claim({ payout: 0n, bondOutcome: "SLASHED", demonstrated: false })).label, "Rejected");
+});
+
+test("queue: only the oldest pending claim can be resolved; retries wait; expiry unblocks", () => {
+  const head = claim({ id: 3, status: "PENDING", payout: 0n, bondOutcome: "NONE", expiresAt: NOW + 1000 });
+  const later = claim({ id: 4, status: "PENDING", payout: 0n, bondOutcome: "NONE", expiresAt: NOW + 1000 });
+  assert.deepEqual(queueState(head, 3, 3600, NOW), { state: "head", waitSeconds: 0 });
+  assert.deepEqual(queueState(later, 3, 3600, NOW), { state: "waiting", waitSeconds: 0 });
+  const retrying = claim({ id: 3, status: "PENDING", attempts: 1, lastAttemptAt: NOW - 600, payout: 0n, bondOutcome: "NONE", expiresAt: NOW + 100000 });
+  assert.deepEqual(queueState(retrying, 3, 3600, NOW), { state: "retry-wait", waitSeconds: 3000 });
+  assert.equal(queueState(retrying, 3, 3600, NOW + 3000).state, "head");
+  const stale = claim({ id: 3, status: "PENDING", payout: 0n, bondOutcome: "NONE", expiresAt: NOW - 1 });
+  assert.equal(queueState(stale, 3, 3600, NOW).state, "expirable");
+  assert.equal(queueState(claim({ status: "RESOLVED" }), 0, 3600, NOW).state, "done");
 });

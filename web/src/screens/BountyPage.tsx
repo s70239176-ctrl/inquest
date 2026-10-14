@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { ArrowRight, ExternalLink, Gavel, ShieldCheck } from "lucide-react";
-import { CONTRACT, getBounty, hasContract, listClaims, readJury, recallResolveTx, rememberResolveTx, sendTx } from "../lib/chain.ts";
+import { CONTRACT, getBounty, getParams, hasContract, listClaims, readJury, recallResolveTx, rememberResolveTx, sendTx } from "../lib/chain.ts";
+import { fingerprintUrl, isHash } from "../lib/fingerprint.ts";
 import { formatDate, formatGen, hostOf, shortAddr, timeLeft } from "../lib/format.ts";
 import { splitRubric } from "../lib/rubric.ts";
-import { bountyPhase, claimStanding, scopeExcerpt, MAX_CLAIMS } from "../lib/view.ts";
+import { bountyPhase, claimStanding, queueState, scopeExcerpt, MAX_CLAIMS } from "../lib/view.ts";
 import { useLoad, useNow, useTx } from "../hooks.ts";
 import { useSession } from "../wallet-context.ts";
 import { Copy, ErrorBox, KV, Skeleton, Stat, TxStatus } from "../components/Ui.tsx";
@@ -20,7 +21,7 @@ const asTab = (t: string | undefined): TabId => (TAB_IDS.includes(t as TabId) ? 
 const PHASE_EXPLAIN: Record<string, string> = {
   "Rubric locked": "The rubric and pool are frozen and no report has been filed yet.",
   "Accepting reports": "Researchers can file reports until the deadline or until the pool is empty.",
-  "Jury review": "At least one report is waiting for the independent jury. Withdrawals stay locked until every report has a verdict.",
+  "Jury review": "At least one report is waiting for the independent jury. Reports are judged in the order they were filed. The project can withdraw only what is beyond the reserve for waiting reports.",
   Settled: "The pool has been fully paid out.",
   Closed: "The deadline has passed. No new reports are accepted.",
   Cancelled: "The project cancelled this bounty before any report was filed and took its pool back.",
@@ -67,7 +68,18 @@ function JuryCard({ claim }: { claim: Claim }) {
             {hostOf(claim.url, 64)} <ExternalLink size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
           </a>
           <p className="mt-2 text-[12px] text-app-soft">Filed {formatDate(claim.createdAt)}. Bond {formatGen(claim.bond, 6)} GEN.</p>
-          <p className="text-[12px] text-app-soft">Read only by the validators. Nothing from the page is stored on-chain.</p>
+          <p className="m-0 mt-1 break-all font-mono text-[11px] text-app-soft" title="sha256 of the page text the researcher committed to">
+            commitment {claim.evidenceHash.slice(0, 16)}…{claim.evidenceHash.slice(-6)}
+          </p>
+          <p className="text-[12px] text-app-soft">
+            {claim.evidenceState === "changed"
+              ? "The page no longer matches this commitment."
+              : claim.evidenceState === "withdrawn"
+                ? "The page stayed unreachable on every spaced retry."
+                : claim.evidenceState === "unavailable"
+                  ? `The page could not be loaded (attempt ${claim.attempts}). It will be retried.`
+                  : "Read only by the validators. Nothing from the page is stored on-chain."}
+          </p>
         </div>
 
         {/* 2 validators */}
@@ -177,6 +189,9 @@ function Activity({ b, claims, idp }: { b: Bounty; claims: Claim[]; idp: string 
   const events: Event[] = [{ at: b.createdAt, title: "Bounty created", detail: `${shortAddr(b.project)} locked the pool and froze the rubric.`, tone: "gold" }];
   for (const c of claims) {
     events.push({ at: c.createdAt, title: `Claim #${c.id} filed`, detail: `${shortAddr(c.researcher)} posted a writeup and a ${formatGen(c.bond, 6)} GEN bond.`, tone: "gray" });
+    if (c.status === "EXPIRED") {
+      events.push({ at: c.resolvedAt, title: `Claim #${c.id}: expired`, detail: "No verdict within the waiting window. The bond was returned and the queue moved on.", tone: "gray" });
+    }
     if (c.status === "RESOLVED") {
       const st = claimStanding(c);
       events.push({
@@ -185,9 +200,13 @@ function Activity({ b, claims, idp }: { b: Bounty; claims: Claim[]; idp: string 
         detail:
           c.payout > 0n
             ? `${formatGen(c.payout)} GEN scheduled to the researcher; bond returned.`
-            : c.bondOutcome === "SLASHED"
-              ? "Bond slashed to the project. No payout."
-              : "Bond returned. No payout.",
+            : c.evidenceState === "changed"
+              ? "The page changed after it was committed to. Bond slashed to the project."
+              : c.evidenceState === "withdrawn"
+                ? "The page stayed unreachable on every retry. Bond slashed to the project."
+                : c.bondOutcome === "SLASHED"
+                  ? "Bond slashed to the project. No payout."
+                  : "Bond returned. No payout.",
         tone: st.tone === "green" ? "green" : st.tone === "red" ? "red" : "gray",
       });
     }
@@ -231,6 +250,10 @@ export function BountyPage({ id, tab }: { id: number; tab?: string }) {
   const tx = useTx();
   const [judging, setJudging] = useState(false);
   const [url, setUrl] = useState("");
+  const [manualHash, setManualHash] = useState<string | null>(null);
+  const [fpError, setFpError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const params = useLoad(() => getParams(), []);
   const active = asTab(tab);
 
   const b = bounty.data;
@@ -257,9 +280,38 @@ export function BountyPage({ id, tab }: { id: number; tab?: string }) {
   async function submitClaim() {
     if (!signer || !b) return;
     setJudging(false);
-    const out = await tx.run((onPhase) => sendTx(signer, "submit_claim", [BigInt(id), url.trim()], b.bond, onPhase));
+    setNote(null);
+    // The researcher commits to what the page says right now. If this browser cannot read it, they can paste a fingerprint
+    // computed with `npm run fingerprint -- <url>` (the same code, run in node).
+    let hash = manualHash !== null && manualHash !== "" ? manualHash.trim() : "";
+    if (hash === "") {
+      try {
+        hash = (await fingerprintUrl(url.trim())).hash;
+        setFpError(null);
+      } catch (e) {
+        setFpError(e instanceof Error ? e.message : String(e));
+        setManualHash((m) => m ?? "");
+        return;
+      }
+    }
+    if (!isHash(hash)) {
+      setFpError("The fingerprint must be 64 lowercase hex characters.");
+      return;
+    }
+    const out = await tx.run((onPhase) => sendTx(signer, "submit_claim", [BigInt(id), url.trim(), hash], b.bond, onPhase));
     if (out && !out.error) {
       setUrl("");
+      setManualHash(null);
+      refresh();
+    }
+  }
+
+  async function expire(claimId: number) {
+    if (!signer) return;
+    setJudging(false);
+    const out = await tx.run((onPhase) => sendTx(signer, "expire_claim", [BigInt(claimId)], 0n, onPhase));
+    if (out && !out.error) {
+      setNote(`Claim #${claimId} expired. The bond was returned and the queue moved on.`);
       refresh();
     }
   }
@@ -275,6 +327,9 @@ export function BountyPage({ id, tab }: { id: number; tab?: string }) {
     if (!signer) return;
     setJudging(true);
     const out = await tx.run((onPhase) => sendTx(signer, "resolve_claim", [BigInt(claimId)], 0n, onPhase, (h) => rememberResolveTx(claimId, h)));
+    if (out?.result === "unavailable") {
+      setNote(`Claim #${claimId}: the page could not be loaded. Nothing was judged and nothing was lost. It will be retried after the wait shown in the table.`);
+    }
     if (out) refresh();
   }
 
@@ -371,7 +426,8 @@ export function BountyPage({ id, tab }: { id: number; tab?: string }) {
                   </div>
                   <p className="hint">
                     Cancel works only before the deadline with zero reports. Withdraw (slashed bonds plus any leftover pool) opens after the
-                    deadline, or once the bounty is depleted, and only when no report is waiting.
+                    deadline, or once the bounty is depleted. A reserve of {formatGen(b.reserved)} GEN stays locked for reports still waiting, so
+                    withdrawing never leaves a researcher unpaid.
                   </p>
                 </div>
               </>
@@ -406,12 +462,20 @@ export function BountyPage({ id, tab }: { id: number; tab?: string }) {
             ) : (
               <div className="panel">
                 <p className="muted" style={{ marginTop: 0 }}>
-                  One public https URL. The page must show the behavior, a concrete reproduction and the cause. The jury reads that page and
-                  earlier accepted writeups on this bounty, and follows no other link.
+                  One public https URL. The page must show the behavior, a concrete reproduction and the cause. Your report is committed to
+                  what the page says now (a fingerprint of its text): if it is edited afterwards, or taken down, the bond is lost. The jury
+                  reads that page and every earlier accepted writeup on this bounty, and follows no other link.
                 </p>
                 <label htmlFor="url">Writeup URL</label>
                 <input id="url" value={url} placeholder="https://…" onChange={(e) => setUrl(e.target.value)} />
                 {url !== "" && !urlOk && <div className="hint err">Use one https URL: no credentials, port, IP address or local host.</div>}
+                {fpError && <div className="hint err">{fpError}</div>}
+                {manualHash !== null && (
+                  <>
+                    <label htmlFor="fp">Evidence fingerprint (sha256, 64 hex characters)</label>
+                    <input id="fp" value={manualHash} placeholder="paste the output of: npm run fingerprint -- <url>" onChange={(e) => setManualHash(e.target.value.trim().toLowerCase())} />
+                  </>
+                )}
                 <div className="hint">
                   Bond <span className="acc mono">{formatGen(b.bond, 6)} GEN</span> · you have used {myClaims} of 3 reports here
                   {pendingMine && " · one of yours is waiting for a verdict"}
@@ -433,7 +497,9 @@ export function BountyPage({ id, tab }: { id: number; tab?: string }) {
               </div>
             )}
 
+            {note && <div className="tx">{note}</div>}
             <h2>Submitted writeups</h2>
+            {b.pendingCount > 1 && <p className="hint">Reports are judged in the order they were filed, so a later copy can never be judged ahead of the original.</p>}
             {claims.error && <ErrorBox message={claims.error} onRetry={claims.reload} />}
             {claims.loading && !claims.data && <Skeleton rows={3} />}
             {claims.data && list.length === 0 && <div className="empty">No reports yet.</div>}
@@ -472,11 +538,24 @@ export function BountyPage({ id, tab }: { id: number; tab?: string }) {
                           </td>
                           <td className="num">{formatGen(c.payout)}</td>
                           <td className="text-right">
-                            {c.status === "PENDING" && (
-                              <button className="small" disabled={tx.busy || !signer} onClick={() => resolve(c.id)} title={signer ? "Start the jury" : "Connect or use the demo account"}>
-                                Resolve
-                              </button>
-                            )}
+                            {(() => {
+                              const q = queueState(c, b.headClaimId, params.data?.retryGap ?? 0, now);
+                              if (q.state === "head")
+                                return (
+                                  <button className="small" disabled={tx.busy || !signer} onClick={() => resolve(c.id)} title={signer ? "Start the jury" : "Connect or use the demo account"}>
+                                    Resolve
+                                  </button>
+                                );
+                              if (q.state === "expirable")
+                                return (
+                                  <button className="small ghost" disabled={tx.busy || !signer} onClick={() => expire(c.id)} title="Waited too long for a verdict: return the bond and move the queue on">
+                                    Expire
+                                  </button>
+                                );
+                              if (q.state === "retry-wait") return <span className="sub">retry in {Math.ceil(q.waitSeconds / 60)} min</span>;
+                              if (q.state === "waiting") return <span className="sub">waits for #{b.headClaimId}</span>;
+                              return null;
+                            })()}
                           </td>
                         </tr>
                       );

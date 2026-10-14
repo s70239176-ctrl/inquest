@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { appeal, appealInfo, getClaim, readTx, recallResolveTx, rememberResolveTx, sendTx } from "../lib/chain.ts";
+import { appeal, appealInfo, getBounty, getClaim, getParams, readTx, recallResolveTx, rememberResolveTx, sendTx } from "../lib/chain.ts";
 import { describeError } from "../lib/decode.ts";
 import { formatDate, formatGen, hostOf, shortAddr } from "../lib/format.ts";
-import { useLoad, useTx } from "../hooks.ts";
+import { useLoad, useNow, useTx } from "../hooks.ts";
+import { queueState } from "../lib/view.ts";
 import { useSession } from "../wallet-context.ts";
 import { Chip, Copy, ErrorBox, KV, Skeleton, Stat, TxStatus } from "../components/Ui.tsx";
 import type { Claim } from "../lib/types.ts";
@@ -20,7 +21,15 @@ const bool = (v: boolean | null): { value: string; kind: "t" | "f" | "n" } =>
   v === null ? { value: "—", kind: "n" } : v ? { value: "true", kind: "t" } : { value: "false", kind: "f" };
 
 function explain(c: Claim): string {
-  if (c.status === "PENDING") return "No verdict yet.";
+  if (c.status === "EXPIRED") return "No verdict was reached within the waiting window, so the claim expired. The bond was returned and no reward was paid. The researcher may file again.";
+  if (c.status === "PENDING") {
+    return c.attempts > 0
+      ? `The page could not be loaded (attempt ${c.attempts}). Nothing was judged and nothing is lost yet: it is retried a limited number of times, spaced apart.`
+      : "No verdict yet.";
+  }
+  if (c.evidenceState === "changed") return "The page no longer matches the fingerprint the researcher committed to when filing, so the report is treated as unsupported. The bond goes to the project.";
+  if (c.evidenceState === "withdrawn") return "The page stayed unreachable on every spaced retry, so it is treated as withdrawn evidence rather than a temporary outage. The bond goes to the project.";
+  if (c.note === "bounty_full") return "A genuine finding, but this bounty has already paid its maximum number of findings. No payout; the bond is returned.";
   if (!c.evidenceAvailable) return "The jury could not load a technical writeup at this URL, so nothing was judged. The bond is returned.";
   if (!c.demonstrated) return "The page does not itself show the bug (behavior, a concrete reproduction and the cause). The bond goes to the project.";
   if (!c.inScope) return "A bug was shown, but the frozen rubric does not cover it. The bond goes to the project.";
@@ -32,6 +41,10 @@ function explain(c: Claim): string {
 export function ClaimPage({ id }: { id: number }) {
   const { signer, connectWallet, useDemoAccount } = useSession();
   const claim = useLoad(() => getClaim(id), [id]);
+  const now = useNow();
+  const bountyId = claim.data?.bountyId;
+  const bounty = useLoad(async () => (bountyId ? getBounty(bountyId) : null), [bountyId]);
+  const params = useLoad(() => getParams(), []);
   const tx = useTx();
   const [hash, setHash] = useState<string | null>(() => recallResolveTx(id));
   const [pasted, setPasted] = useState("");
@@ -76,6 +89,16 @@ export function ClaimPage({ id }: { id: number }) {
     }
   }
 
+  async function expire() {
+    if (!signer) return;
+    const out = await tx.run((onPhase) => sendTx(signer, "expire_claim", [BigInt(id)], 0n, onPhase));
+    if (out && !out.error) {
+      claim.reload();
+      bounty.reload();
+    }
+  }
+
+  const queue = queueState(c, bounty.data?.headClaimId ?? 0, params.data?.retryGap ?? 0, now);
   const finalized = settle.data === "FINALIZED";
   const ev = bool(c.evidenceAvailable);
   const dem = bool(c.demonstrated);
@@ -91,7 +114,7 @@ export function ClaimPage({ id }: { id: number }) {
         <h1 style={{ margin: "6px 0" }}>Claim #{c.id}</h1>
         <span className="row" style={{ gap: 6 }}>
           <Chip value={c.status} />
-          {resolved && <Chip value={c.bondOutcome} />}
+          {c.status !== "PENDING" && <Chip value={c.bondOutcome} />}
         </span>
       </div>
       <div className="panel tight row between">
@@ -104,6 +127,9 @@ export function ClaimPage({ id }: { id: number }) {
           </a>
         </KV>
         <KV k="Bond">{formatGen(c.bond, 6)} GEN</KV>
+        <KV k="Evidence commitment">
+          <Copy text={c.evidenceHash} label={`${c.evidenceHash.slice(0, 10)}…${c.evidenceHash.slice(-6)}`} />
+        </KV>
       </div>
 
       <h2>The jury's answer: five fields, nothing else</h2>
@@ -120,17 +146,30 @@ export function ClaimPage({ id }: { id: number }) {
       </div>
       <p className="muted">{explain(c)}</p>
 
-      {!resolved && (
+      {c.status === "PENDING" && (
         <div className="panel">
           <p style={{ marginTop: 0 }}>
-            <b>Waiting for a verdict.</b> Anyone can start the jury. Each validator fetches the writeup itself and answers the five fields; if
-            they cannot agree, nothing moves and you can try again.
+            <b>Waiting for a verdict.</b> Anyone can start the jury. Each validator fetches the writeup itself, checks it still matches the
+            fingerprint committed at filing, and answers the five fields; if they cannot agree, nothing moves and you can try again.
           </p>
+          {queue.state === "waiting" && (
+            <p className="hint">
+              Claims are judged in the order they were filed. <a href={`#/c/${bounty.data?.headClaimId}`}>Claim #{bounty.data?.headClaimId}</a> comes first.
+            </p>
+          )}
+          {queue.state === "retry-wait" && <p className="hint">The page could not be loaded last time. The next attempt opens in about {Math.ceil(queue.waitSeconds / 60)} minutes.</p>}
+          {queue.state === "expirable" && <p className="hint">This claim has waited past its window. Anyone can expire it: the bond is returned and the queue moves on.</p>}
           <div className="actions" style={{ marginTop: 8 }}>
             {signer ? (
-              <button disabled={tx.busy} onClick={resolve}>
-                Resolve claim
-              </button>
+              queue.state === "expirable" ? (
+                <button disabled={tx.busy} onClick={expire}>
+                  Expire claim
+                </button>
+              ) : (
+                <button disabled={tx.busy || queue.state === "waiting" || queue.state === "retry-wait"} onClick={resolve}>
+                  Resolve claim
+                </button>
+              )
             ) : (
               <>
                 <button onClick={connectWallet}>Connect wallet</button>

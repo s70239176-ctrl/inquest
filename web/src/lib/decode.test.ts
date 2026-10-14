@@ -17,6 +17,7 @@ test("every contract refusal has plain-language copy", () => {
     "empty pool", "bad title", "bad rubric", "bad url", "bad payouts", "bad deadline", "bad bond", "pool below high payout",
     "too late", "bond mismatch", "pending exists", "attempt limit", "claim limit", "not project", "nothing to withdraw",
     "already resolved", "not open", "has claims", "project cannot claim", "bad judgment",
+    "bad hash", "resolve earlier claim first", "retry too soon", "claim expired", "not expired yet", "nothing to recover",
   ]) {
     assert.ok(REFUSALS[key], key);
   }
@@ -62,4 +63,25 @@ test("toClaim keeps unresolved verdict fields null", () => {
     demonstrated: true, in_scope: true, duplicate_of: 1, severity: "none", payout: 0, bond_outcome: "RETURNED", created_at: 5, resolved_at: 9 } });
   assert.equal(r.duplicateOf, 1);
   assert.equal(r.bondOutcome, "RETURNED");
+});
+
+test("v2 claim and bounty fields decode, and older shapes default safely", () => {
+  const c = toClaim({
+    id: 3, bounty_id: 1, researcher: "0xAB", url: "https://a.b/c", evidence_hash: "f".repeat(64), bond: 100, status: "RESOLVED",
+    evidence_available: true, demonstrated: false, in_scope: false, duplicate_of: null, severity: "none", payout: 0,
+    bond_outcome: "SLASHED", evidence_state: "changed", note: "evidence_changed", attempts: 0, last_attempt_at: 0, expires_at: 99,
+    created_at: 1, resolved_at: 2,
+  });
+  assert.equal(c.evidenceHash, "f".repeat(64));
+  assert.equal(c.evidenceState, "changed");
+  assert.equal(c.note, "evidence_changed");
+  assert.equal(c.expiresAt, 99);
+  const b = toBounty({
+    id: 1, project: "0xAB", title: "t", repo_url: "u", rubric: "r", low_payout: 1, medium_payout: 2, high_payout: 3, bond: 1, deadline: 9,
+    created_at: 1, status: "OPEN", pool: 5, slashed: 0, reserved: 3, head_claim_id: 7, claim_ids: [7], accepted_ids: [], claim_count: 1,
+    pending_count: 1, withdrawable: 2,
+  });
+  assert.equal(b.reserved, 3n);
+  assert.equal(b.headClaimId, 7);
+  assert.ok(TIME_DEPENDENT.has("retry too soon") && TIME_DEPENDENT.has("claim expired"));
 });

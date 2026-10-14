@@ -1,5 +1,7 @@
 // Deploy Inquest to Studionet with a throwaway key made in this script (Studionet deploys are gasless).
-// Usage (from web/):  node scripts/deploy.mjs      -> prints the contract address
+// Usage (from web/):  node scripts/deploy.mjs [retry_gap_s] [max_unavailable] [claim_expiry_s]      -> prints the contract address
+// Defaults are the production parameters: retry gap 6 h, 3 unreachable attempts, claims expire after 14 days.
+// These are fixed at deployment forever: there is no admin to change them.
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -8,10 +10,11 @@ import { clientFor, freshKey, paced, sleep } from "./chain-lib.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 const code = readFileSync(join(here, "..", "..", "contracts", "inquest.py"), "utf8");
 
+const [gap = 21600, attempts = 3, expiry = 1209600] = process.argv.slice(2).map(Number);
 const key = freshKey();
 const client = clientFor(key);
-console.log("deploying Inquest to Studionet…");
-const hash = await paced(() => client.deployContract({ code, args: [] }));
+console.log(`deploying Inquest to Studionet (retry_gap=${gap}s, max_unavailable=${attempts}, claim_expiry=${expiry}s)…`);
+const hash = await paced(() => client.deployContract({ code, args: [BigInt(gap), BigInt(attempts), BigInt(expiry)] }));
 console.log("deploy tx", hash);
 
 let address;

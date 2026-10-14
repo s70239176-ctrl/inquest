@@ -5,8 +5,8 @@
  */
 import { createAccount, createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
-import type { Bounty, Claim, Page, Phase, TxOutcome } from "./types.ts";
-import { TIME_DEPENDENT, REFUSALS, decodeRevert, plain, refusalKey, toBounty, toClaim, type Raw } from "./decode.ts";
+import type { Bounty, Claim, Page, Params, Phase, TxOutcome } from "./types.ts";
+import { TIME_DEPENDENT, REFUSALS, decodeRevert, plain, refusalKey, toBounty, toClaim, toParams, type Raw } from "./decode.ts";
 import { decodeReceiptResult } from "./calldata.ts";
 import { assertSignerReady, getProvider, type Signer } from "./signer.ts";
 
@@ -92,6 +92,10 @@ export async function listBounties(offset = 0, limit = 20): Promise<Page<Bounty>
   return { total: Number(r.total), items: (r.items as Raw[]).map(toBounty) };
 }
 
+export async function getParams(): Promise<Params> {
+  return toParams((await view("get_params", [])) as Raw);
+}
+
 export async function getBounty(id: number): Promise<Bounty> {
   return toBounty((await view("get_bounty", [BigInt(id)])) as Raw);
 }
@@ -165,6 +169,16 @@ function leaderProblem(tx: RawTx): string | undefined {
   return undefined;
 }
 
+/** The string a finished call returned (resolve_claim answers "unavailable", a band, or an outcome). */
+function leaderReturn(tx: RawTx): string | undefined {
+  const receipts = tx.consensus_data?.leader_receipt;
+  const leader = receipts?.find((r) => r.mode === "leader") ?? receipts?.[0];
+  const res = leader?.result;
+  const payload = typeof res === "string" ? res : (res as { payload?: string } | undefined)?.payload;
+  const decoded = decodeReceiptResult(payload);
+  return decoded.kind === "return" && typeof decoded.value === "string" ? decoded.value : undefined;
+}
+
 export async function readTx(hash: string): Promise<RawTx | null> {
   return (await paced(() =>
     readClient().request({ method: "eth_getTransactionByHash", params: [hash] }),
@@ -208,7 +222,7 @@ async function follow(hash: string, onPhase?: (p: Phase, detail?: string) => voi
       if (error) return { hash, status, error };
       if (status === "FINALIZED") {
         onPhase?.("finalized", status);
-        return { hash, status };
+        return { hash, status, result: tx ? leaderReturn(tx) : undefined };
       }
       accepted = true;
       onPhase?.("accepted", status);

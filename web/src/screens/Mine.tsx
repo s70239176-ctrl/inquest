@@ -89,12 +89,24 @@ export function Mine() {
   const events = [
     ...myClaims.flatMap((c) => {
       const out = [{ at: c.createdAt, title: `Filed claim #${c.id}`, detail: `On ${titleOf(c.bountyId) ?? `bounty ${c.bountyId}`} with a ${formatGen(c.bond, 6)} GEN bond.` }];
+      if (c.status === "EXPIRED") {
+        out.push({ at: c.resolvedAt, title: `Claim #${c.id}: expired`, detail: "No verdict in the waiting window. Bond returned, no reward." });
+      }
       if (c.status === "RESOLVED") {
         const s = claimStanding(c);
         out.push({
           at: c.resolvedAt,
           title: `Claim #${c.id}: ${s.label.toLowerCase()}`,
-          detail: c.payout > 0n ? `${formatGen(c.payout)} GEN scheduled, bond returned.` : c.bondOutcome === "SLASHED" ? "Bond slashed to the project." : "Bond returned, no payout.",
+          detail:
+            c.payout > 0n
+              ? `${formatGen(c.payout)} GEN scheduled, bond returned.`
+              : c.evidenceState === "changed"
+                ? "The page changed after filing. Bond slashed to the project."
+                : c.evidenceState === "withdrawn"
+                  ? "The page stayed unreachable on every retry. Bond slashed to the project."
+                  : c.bondOutcome === "SLASHED"
+                    ? "Bond slashed to the project."
+                    : "Bond returned, no payout.",
         });
       }
       return out;

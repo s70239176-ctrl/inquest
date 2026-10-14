@@ -1,5 +1,6 @@
-"""Shared helpers for Inquest Direct Mode tests."""
+"""Shared helpers for Inquest Direct Mode tests (contract v2)."""
 import json
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 
@@ -10,9 +11,12 @@ MODULE = "_contract_inquest"
 T0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
 NOW0 = int(T0.timestamp())
 DAY = 86400
+HOUR = 3600
 
 LOW, MED, HIGH, BOND = 1000, 3000, 10000, 100
 POOL = 20000
+# deployment parameters used by the suite (the live suite deploys much shorter ones)
+RETRY_GAP, MAX_UNAVAILABLE, CLAIM_EXPIRY = HOUR, 3, 7 * DAY
 
 RUBRIC = (
     "In scope: memory-safety and authorization bugs in the parser crate.\n"
@@ -25,6 +29,7 @@ REPO = "https://github.com/acme/parser"
 GOOD_URL = "https://writeups.example.org/report-1"
 SECOND_URL = "https://writeups.example.org/report-2"
 INJECT_URL = "https://writeups.example.org/inject"
+DEAD_URL = "https://writeups.example.org/gone"
 TRAP_HOST = "evil-target.example.net"
 
 GOOD_PAGE = (
@@ -37,8 +42,12 @@ INJECT_PAGE = (
 )
 
 
-class Refused(Exception):
-    """A payable call the contract refused softly: it returned a stable reason and refunded the attached value."""
+def url_n(i: int) -> str:
+    return f"https://writeups.example.org/finding-{i}"
+
+
+def page_n(i: int) -> str:
+    return f"Finding {i}: a distinct bug with its own reproduction and its own root cause number {i}."
 
 
 def iso(offset_seconds: int = 0) -> str:
@@ -57,8 +66,15 @@ def judgment(evidence=True, demonstrated=True, in_scope=True, dup=None, sev="hig
     return body
 
 
-def judgment_json(**kw) -> str:
-    return json.dumps(judgment(**kw))
+def result(source="ok", **kw):
+    """A full leader result as the contract passes it around: five fields plus the source check."""
+    base = judgment(**kw)
+    if source == "unavailable":
+        base = judgment(evidence=False, demonstrated=False, in_scope=False, dup=None, sev="none")
+    elif source == "changed":
+        base = judgment(evidence=True, demonstrated=False, in_scope=False, dup=None, sev="none")
+    base["source"] = source
+    return base
 
 
 def hexof(addr) -> str:
@@ -83,7 +99,7 @@ def contract_module():
 
 @pytest.fixture
 def world(direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie):
-    """alice = project, bob/charlie = researchers. Records every transfer and every outbound request."""
+    """alice = project, bob/charlie = researchers. Records every transfer, request and prompt."""
     direct_vm.strict_mocks = True
     for addr in (direct_alice, direct_bob, direct_charlie):
         direct_vm.deal(addr, 10**9)
@@ -114,7 +130,7 @@ def world(direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie):
     direct_vm._match_web_mock = spy_web
     direct_vm._match_llm_mock = spy_llm
 
-    contract = direct_deploy(CONTRACT)
+    contract = direct_deploy(CONTRACT, RETRY_GAP, MAX_UNAVAILABLE, CLAIM_EXPIRY)
     set_clock(direct_vm, 0)
 
     class World:
@@ -127,12 +143,19 @@ def world(direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie):
         requests = fetched
         llm_prompts = prompts
         deposited = 0
+        pages = {}  # url -> page text, or None for "does not load"
+
+        # ---------------------------------------------------------- evidence
+        @staticmethod
+        def hash_of(page) -> str:
+            m = contract_module()
+            return m.content_hash(m.clean_page(page.encode("utf-8")))
 
         # ---------------------------------------------------------- actions
         @classmethod
         def create(cls, sender=None, pool=POOL, **overrides):
             p = dict(title="Parser bounty", repo_url=REPO, rubric=RUBRIC, low=LOW, med=MED, high=HIGH,
-                     deadline=NOW0 + 30 * DAY, bond=BOND)
+                     deadline=NOW0 + 60 * DAY, bond=BOND)
             p.update(overrides)
             direct_vm.sender = sender or direct_alice
             direct_vm.value = pool
@@ -144,11 +167,21 @@ def world(direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie):
                 raise Refused(res["reason"])
             return res["id"]
 
+        _UNSET = object()
+
         @classmethod
-        def submit(cls, bid, url=GOOD_URL, sender=None, value=BOND):
+        def submit(cls, bid, url=GOOD_URL, sender=None, value=BOND, page=_UNSET, evidence=None):
+            """
+            Submit a claim, committing to `page` (default: whatever is registered for the URL, else GOOD_PAGE).
+            page=None means the URL does not load; `evidence` overrides the committed fingerprint outright.
+            """
+            if page is cls._UNSET:
+                page = cls.pages.get(url, GOOD_PAGE)
+            cls.pages[url] = page
+            commit = evidence or cls.hash_of(page if page is not None else "a page that never loaded")
             direct_vm.sender = sender or direct_bob
             direct_vm.value = value
-            res = contract.submit_claim(bid, url)
+            res = contract.submit_claim(bid, url, commit)
             direct_vm.value = 0
             cls.deposited += value
             if not res["ok"]:
@@ -162,21 +195,22 @@ def world(direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie):
             direct_vm.strict_mocks = strict
 
         @classmethod
-        def mock_world(cls, pages=None, llm=None):
-            """pages: {url_regex: body | int status}. llm: dict, JSON string or None for the default."""
+        def mock_world(cls, llm=None):
+            """Mock every registered URL (anchored, so finding-1 never matches finding-10) and the judge."""
             cls.reset_mocks()
-            for pattern, body in (pages or {}).items():
-                if isinstance(body, int):
-                    direct_vm.mock_web(pattern, {"method": "GET", "status": body, "body": ""})
+            for url, page in cls.pages.items():
+                pattern = re.escape(url) + "$"
+                if page is None:
+                    direct_vm.mock_web(pattern, {"method": "GET", "status": 404, "body": ""})
                 else:
-                    direct_vm.mock_web(pattern, {"method": "GET", "status": 200, "body": body})
+                    direct_vm.mock_web(pattern, {"method": "GET", "status": 200, "body": page})
             if llm is None:
                 llm = judgment()
             direct_vm.mock_llm(r"INQUEST_JUDGE", llm if isinstance(llm, str) else json.dumps(llm))
 
         @classmethod
-        def resolve(cls, cid, pages=None, llm=None, sender=None):
-            cls.mock_world(pages if pages is not None else {r"report-1": GOOD_PAGE}, llm)
+        def resolve(cls, cid, llm=None, sender=None):
+            cls.mock_world(llm)
             direct_vm.sender = sender or direct_charlie
             return contract.resolve_claim(cid)
 
@@ -195,15 +229,15 @@ def world(direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie):
 
         @classmethod
         def held(cls) -> int:
-            """GEN the contract should still hold: pools + slashed + unresolved bonds."""
-            total = 0
+            """GEN the contract should still hold: pools + slashed + live bonds + failed-payment ledger."""
+            total = int(contract.get_failed_total())
             for bid in range(1, 100):
                 try:
                     b = contract.get_bounty(bid)
                 except Exception:
                     break
                 total += b["pool"] + b["slashed"]
-            for cid in range(1, 200):
+            for cid in range(1, 400):
                 try:
                     c = contract.get_claim(cid)
                 except Exception:
@@ -212,4 +246,9 @@ def world(direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie):
                     total += c["bond"]
             return total
 
+    World.pages = {}
     return World
+
+
+class Refused(Exception):
+    """A payable call the contract refused softly: it returned a stable reason and refunded the attached value."""
