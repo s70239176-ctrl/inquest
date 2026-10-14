@@ -37,7 +37,7 @@ Each item is one step: heading (optional) then instruction.
 5. **Run the jury.** Click **Resolve** on the claim (claims are judged oldest first). The validators each fetch the page and vote. Allow up to about two minutes.
 6. **Inspect the verdict.** Click the claim number to see the five fields and the settlement timeline. Then open the bounty's **Jury review** tab and click **Load validator votes** to see each validator's vote.
 
-Shortcut (optional): https://inquest-repro.vercel.app/#/b/1/jury opens a real, already-finalized claim with the validators' votes.
+Shortcut (optional): https://inquest-repro.vercel.app/#/b/1/jury opens two real, finalized claims (a high payout and a medium payout). To see the validators' votes for claim 1, click **Read votes** and paste its resolve transaction `0xd0d3a795718d68f9f4299857aae745e199aa750848fb62aa0a906dbe50d18231`.
 
 ## 06 Review verification
 
