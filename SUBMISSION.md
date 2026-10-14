@@ -5,7 +5,7 @@
 **Live app.** https://inquest-repro.vercel.app/  
 **Repository.** https://github.com/s70239176-ctrl/inquest  
 **Network.** GenLayer Studionet (chain id 61999)  
-**Contract.** [`0xb65Ff1E3F4DDE55fF56d3A5ee98f51aDB7944630`](https://explorer-studio.genlayer.com/address/0xb65Ff1E3F4DDE55fF56d3A5ee98f51aDB7944630) on the GenLayer Studio Explorer, deployed by [`0x6e759e8f…9935384e`](https://explorer-studio.genlayer.com/tx/0x6e759e8f45c53ce64df08ec3b20ddfb25bbe42fdbd642ba84f8da07a9935384e).  
+**Contract.** [`0x163CD9562dd603C146a6461d1C1c7655AD556fF7`](https://explorer-studio.genlayer.com/address/0x163CD9562dd603C146a6461d1C1c7655AD556fF7) on the GenLayer Studio Explorer, deployed by [`0x9f7a388c…aa43ef7e`](https://explorer-studio.genlayer.com/tx/0x9f7a388cd7256d189dac785b599a492cdfa4c43c68689532817fe093aa43ef7e).  
 **Live test run.** `web/e2e/live.mjs` deploys a fresh contract on every run; the address and every transaction hash of the last verified run are in [docs/E2E-REPORT.md](docs/E2E-REPORT.md).
 **Review response.** [docs/STEWARD-RESPONSE.md](docs/STEWARD-RESPONSE.md) answers the steward review point by point and lists what is not demonstrated.
 
@@ -38,13 +38,13 @@ Bug bounties run on trust in a reviewer. Researchers fear an arbitrary "duplicat
 | Layer | Evidence |
 | --- | --- |
 | Contract | `genvm-lint` passes; 116 Direct Mode tests (settlement table, precedence in every order, duplicates beyond an eight-report window, evidence commitments, retries, expiry, withdraw reserve, failed-payment recovery) |
-| Live, Studionet | `web/e2e/live.mjs`: real validators, real fetches of public fixtures, GEN verified via the contract balance and contract-state readbacks: **44 pass, 1 not demonstrated, 0 fail**. Report with transaction hashes: [docs/E2E-REPORT.md](docs/E2E-REPORT.md) |
-| Recipient balances | `web/e2e/contract-wallet.mjs`: reward, bond refund, cancellation and withdrawal land in a contract wallet's own balance: **6/6**. [docs/WALLET-DELIVERY-studionet-contract-wallets.md](docs/WALLET-DELIVERY-studionet-contract-wallets.md) |
+| Live, Studionet | `web/e2e/live.mjs`: real validators, real fetches of public fixtures, GEN verified via the contract balance and contract-state readbacks: **45 pass, 0 fail**. Report with transaction hashes: [docs/E2E-REPORT.md](docs/E2E-REPORT.md) |
+| Recipient balances | `web/e2e/wallet-delivery.mjs`: reward, bond refund, cancellation and withdrawal each land in an ordinary account's own balance: **5/5** on Studionet. [docs/WALLET-DELIVERY-Genlayer-Studio-Network.md](docs/WALLET-DELIVERY-Genlayer-Studio-Network.md) |
 | Web | typecheck, 48 unit tests (including Python/JS fingerprint parity), production build; driven end to end in a browser against live Studionet (fingerprint, file, resolve, payout) with the built-in demo account |
 
 ## Honest limits
 
-- **Delivery to an externally-owned account is not demonstrated.** Studionet does not credit EOAs from contract-emitted transfers; the same payment paths are shown reaching contract wallets, and `web/e2e/wallet-delivery.mjs` is ready to prove the EOA case on a funded testnet account. **MetaMask-driven transactions were not performed** ([docs/METAMASK-CHECKLIST.md](docs/METAMASK-CHECKLIST.md)).
+- **Only Studionet was tested for wallet delivery.** Rewards, bond refunds, cancellations and withdrawals each reached an ordinary account's own balance there (5/5, `web/e2e/wallet-delivery.mjs`); a testnet was not run. **MetaMask-driven transactions were not performed** ([docs/METAMASK-CHECKLIST.md](docs/METAMASK-CHECKLIST.md)).
 - **Protocol appeals cannot be filed on Studionet from the browser SDK** (no appeals contract in its chain config, and the node rejects `submitAppeal`). The UI shows the appeal window and withholds the button there; the same panel shows the charge and the button where the network supports it. The live suite records this as a skipped, platform-limited check. Re-execution safety is covered by the finalization-only transfers, the idempotent `resolve_claim`, and an offline snapshot/revert test.
 - Requiring all five fields to match means long or borderline writeups often end UNDETERMINED (nothing moves; resolve again). That is the intended fail-safe, at a cost in liveness.
 - Studionet only; `genlayer-js` 1.1.8 is pinned because the 2.0 release candidate cannot read from or deploy to the live Studionet.

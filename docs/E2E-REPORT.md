@@ -1,9 +1,9 @@
 # Live end-to-end report (Studionet, contract v2)
 
-- Run: 2026-10-14T08:14:59.585Z → 2026-10-14T09:09:08.243Z (54 min)
-- Contract: `0x6c467DB3E69746a9D9f9fCa6d8c580FCd306b245` (deploy tx `0x6fd877ee8d394157fbae4e2156f82f65c873c17dbb899351c34a5b0d2c119157`), parameters retry_gap=90s, max_unavailable=2, claim_expiry=3000s
-- Fixtures: https://raw.githubusercontent.com/s70239176-ctrl/inquest/steward-v2/fixtures/tinyparse/
-- Result: **44/45 checks passed, 1 not demonstrated (platform limitation), 0 failed**
+- Run: 2026-10-14T10:02:24.265Z → 2026-10-14T18:49:08.078Z (527 min)
+- Contract: `0xb2Da7DFe1417D77B858e8D9e306b646b16eA3729` (deploy tx `0xc2c8d07aecd773878667bc12adebb14b4c8e4e3ea1340cf1ed00d06d88c9b376`), parameters retry_gap=90s, max_unavailable=2, claim_expiry=3000s
+- Fixtures: https://raw.githubusercontent.com/s70239176-ctrl/inquest/main/fixtures/tinyparse/
+- Result: **45/45 checks passed, 0 not demonstrated (platform limitation), 0 failed**
 
 Nothing is mocked: validators fetched the fixture pages and ran their own models. GEN is verified through the contract's own balance and authoritative contract-state readbacks (get_bounty / get_claim / get_params).
 
@@ -22,11 +22,11 @@ Nothing is mocked: validators fetched the fixture pages and ran their own models
 | 2e | pool decremented and the claim is recorded as accepted | PASS | pool 20000 |
 | 3a | same area, different cause: not a duplicate; out-of-bounds READ is paid medium (not high) | PASS | evidence=true demonstrated=true in_scope=true dup=null severity=medium payout=3000 bond=RETURNED state=ok |
 | 4a | real but excluded (DoS) is judged out of scope: no payout, bond slashed to the project | PASS | evidence=true demonstrated=true in_scope=false dup=null severity=none payout=0 bond=SLASHED state=ok |
-| 1a | injection page: never high, never paid | PASS | evidence=true demonstrated=false in_scope=false dup=null severity=none payout=0 bond=SLASHED state=ok |
-| 1b | injection page: settled by the table (not-evidence -> bond returned, or not-demonstrated -> bond slashed) | PASS | bond=SLASHED evidence=true |
+| 1a | injection page: never high, never paid | PASS | evidence=false demonstrated=false in_scope=false dup=null severity=none payout=0 bond=RETURNED state=ok |
+| 1b | injection page: settled by the table (not-evidence -> bond returned, or not-demonstrated -> bond slashed) | PASS | bond=RETURNED evidence=false |
 | 1c | pool after A (high) and C (medium) is exactly 30000-10000-3000 | PASS | pool 17000 |
 | 13d | re-resolving a settled claim is refused and moves nothing | PASS | revert=already resolved |
-| PAY | finalized transfer increased the researcher's own wallet balance | NOT DEMONSTRATED | NOT demonstrated on Studionet: wallet balance is 0. Studionet does not credit externally-owned accounts from contract-emitted transfers (measured; see docs/STEWARD-RESPONSE.md). |
+| PAY | finalized transfer increased the researcher's own wallet balance | PASS | wallet 10100 |
 | P0 | both claims are accepted, original first | PASS | claims 7, 8 |
 | P1 | the later claim cannot be judged before the original ('resolve earlier claim first') | PASS | revert=resolve earlier claim first |
 | P2 | readback: head_claim_id is the original and both are still PENDING | PASS | head 7 |
@@ -41,7 +41,7 @@ Nothing is mocked: validators fetched the fixture pages and ran their own models
 | R2 | http:// URL refused with 'bad url' and refunded | PASS | reason=bad url |
 | R3 | a second claim while one is pending is refused ('pending exists') and refunded | PASS | reason=pending exists |
 | W1 | readback after the deadline with one PENDING claim: reserved == high payout, withdrawable == pool - reserve | PASS | reserved 10000, withdrawable 20000 |
-| W2 | withdraw releases only the unreserved pool, on finalization | PASS | balance 84600 -> 64600 |
+| W2 | withdraw releases only the unreserved pool, on finalization | PASS | balance 84500 -> 64500 |
 | W3 | claims after the deadline are refused ('too late') | PASS | reason=too late |
 | W4 | the pending claim is STILL paid in full after the project withdrew (nothing stranded) | PASS | evidence=true demonstrated=true in_scope=true dup=null severity=high payout=10000 bond=RETURNED state=ok |
 | W5 | after the claim settles the reserve is gone and nothing is left to withdraw | PASS | pool 0, reserved 0 |
@@ -50,80 +50,80 @@ Nothing is mocked: validators fetched the fixture pages and ran their own models
 | Q1 | a claim cannot be expired before its waiting window ('not expired yet') | PASS | revert=not expired yet |
 | Q2 | a claim queued behind an unresolved one cannot be judged ('resolve earlier claim first') | PASS | revert=resolve earlier claim first |
 | Q3 | a claim past its window can no longer be judged ('claim expired') | PASS | revert=claim expired |
-| Q4 | anyone can expire it: bond returned on finalization, status EXPIRED, no reward | PASS | balance 75600 -> 75500; evidence=null demonstrated=null in_scope=null dup=null severity=null payout=0 bond=RETURNED state=expired |
+| Q4 | anyone can expire it: bond returned on finalization, status EXPIRED, no reward | PASS | balance 75500 -> 75400; evidence=null demonstrated=null in_scope=null dup=null severity=null payout=0 bond=RETURNED state=expired |
 | Q5 | the queue moves on: the next claim is now the head | PASS | head 23 |
 | Q6 | the queued claim is judged and paid after the stuck one expired | PASS | evidence=true demonstrated=true in_scope=true dup=null severity=medium payout=3000 bond=RETURNED state=ok |
-| ACC | conservation: contract balance == sum(pool + slashed) + pending bonds + failed-payment ledger | PASS | balance 72400, pools+slashed 72400, pending bonds 0, failed ledger 0 |
+| ACC | conservation: contract balance == sum(pool + slashed) + pending bonds + failed-payment ledger | PASS | balance 72300, pools+slashed 72300, pending bonds 0, failed ledger 0 |
 
 ## Notes
 
-- claim A jury votes (finalized consensus_data.votes): {"0x03D58A4DeF6fDFc032A56374785a5F571D07Bc11":"agree","0x14402D49f317CE1a2F35BAE01b1804A2A9703dCb":"idle","0x4404Fb70d490c935758146f42A73DC850FF95C71":"agree","0x6737ca1d6BDF8b7C4f19143E2D55581Ca64eb7C3":"agree","0xBBb165E4c9d73a1493D363280f7067Cd07891dBE":"idle"}
-- recipient-wallet observation on Studionet: researcher 0xd0f78642abc9fdcdeda854f12cebbea635ab601f was owed 10100 (finalized transfer, contract balance fell by exactly that) and its own balance reads 0.
+- claim A jury votes (finalized consensus_data.votes): {"0x3D83ab507785b95ca5C208bEc80CCe3D5ca98100":"agree","0x4aba638Cf0Cf5249437AaD968fC69dde46ae6BAC":"agree","0x772ffCd1dF6Cc566eC4b8d3f4F4f8eBbb6B36C84":"idle","0xBBb165E4c9d73a1493D363280f7067Cd07891dBE":"idle","0xec2Fb79cd12255Eb34886CEd7332f27B98DEe658":"agree"}
+- recipient-wallet observation on Studionet: researcher 0x7de42d78bc124f388df46dd7861136086a1bf03c was owed 10100 (finalized transfer, contract balance fell by exactly that) and its own balance reads 10100.
 
 ## Transactions
 
 | Step | Status | Revert | Hash |
 | --- | --- | --- | --- |
-| create_bounty(Withdraw reserve bounty) | ACCEPTED |  | `0x58ca31ffa920bafc58319f5fab1115f889ed12cd77ecb1847025d9e79a864436` |
-| submit_claim(01-high-heap-overflow.md) | ACCEPTED |  | `0xb5fd66d3110c53d8123790f751b735b686fb0a16fdab9df35be5aee59b9a0878` |
-| create_bounty(Queue and expiry bounty) | ACCEPTED |  | `0xc78f363a33c737c337820ae61a100f8a5f957c2e2095df83ee79d5810f8303ed` |
-| submit_claim(report) | ACCEPTED |  | `0x4cfce7342e0951708cd42b8cb768933add8101e82e25524b2821adbaa3e31256` |
-| create_bounty(Main bounty) | ACCEPTED |  | `0x3b6d4ef1bc7237b8c30b926c179aab0b0a2bb35a92b47f52a53676d988fdd27f` |
-| submit_claim(01-high-heap-overflow.md) | ACCEPTED |  | `0xa26fabcfbaadc37952fd184a14a4e1a9a808da1cf87a1d3bfeb413523dfa63de` |
-| resolve_claim #3 (attempt 1) | FINALIZED |  | `0x30cf1aaa9d5f3e7ea39e4ed370b0f279cf2877cff084fbc105e2a53e328d48c6` |
-| submit_claim(02-medium-oob-read.md) | ACCEPTED |  | `0xf74d2119ca0de9cb396e4a3965937b7b1b0f4e950f52243fad40139630d4bad9` |
-| resolve_claim #4 (attempt 1) | FINALIZED |  | `0x91e6fd1ff707a07592a6be22bf6c6cdf48fae1ed5d0ad1753a4adac37fa1b1fe` |
-| submit_claim(04-out-of-scope-dos.md) | ACCEPTED |  | `0x62aa914297383bb0ca5aed792233a6b57ac7fd833fd31158365327ffea329a5d` |
-| resolve_claim #5 (attempt 1) | FINALIZED |  | `0x3f68a7ebb0627096364b627abcb78ba01ce5f2fe6405de7992962bce9187f01e` |
-| submit_claim(05-injection.md) | ACCEPTED |  | `0xd828daa54cf114aecd829a5423c0da3540f2975e724201d4319e3a59a484f301` |
-| resolve_claim #6 (attempt 1) | FINALIZED |  | `0xf86ee1fca0dd05a184134323784b5ae66ea97660b6f4f2eeb4f3fd026d96ece9` |
-| create_bounty(Precedence bounty) | ACCEPTED |  | `0xf87fa692a0144c8d6df25a73ae26918610bc35d008a4ce2bb95b5f40c48fd839` |
-| submit_claim(01-high-heap-overflow.md) | ACCEPTED |  | `0xd2b1fa1ba39996a171c948d638ca1c62adbd63aea4df0bea47a59b0ddfff1321` |
-| submit_claim(03-duplicate-of-high.md) | ACCEPTED |  | `0xff088612ea04b8dc1666eb181aae4397d5a4be9bb4ee4cb897f0c25494149bcd` |
-| resolve_claim (copier first, refused) | ACCEPTED | resolve earlier claim first | `0x7a4a889c2014d1966699dc86646f12625c6840b1d6486d09b0b1bd1fc3dc8da9` |
-| resolve_claim #7 (attempt 1) | FINALIZED |  | `0xd64c465e3a5ecd60d49ba757eb820c3e8feec82d2d4ca8037d94b37c0bd1b17b` |
-| resolve_claim #8 (attempt 1) | FINALIZED |  | `0xf785e460e2f5be0313739e7268e060058b1950095f9412a77d98a24f4fcacc5c` |
-| create_bounty(Commitment bounty) | ACCEPTED |  | `0xa1df89375f4730a0ff476f42a28c9111cc6217dcaf2138b5cd6e21d0e8eeec3e` |
-| submit_claim(01-high-heap-overflow.md) | ACCEPTED |  | `0x378b3ad179be3df942f0447d541a8da33456bc7f6332509ac4c3ce6c700448b3` |
-| resolve_claim #9 (attempt 1) | FINALIZED |  | `0x0525f9ceb6f697571d0e4f9d18e681c76f69fc1ffe552181a1c941e6ad15baec` |
-| submit_claim(report) | ACCEPTED |  | `0x1596ad69c35f7c6bf647bf02a3c84cfd27c22451e58303d99881d1eb3b085c56` |
-| resolve_claim #10 (attempt 1) | FINALIZED |  | `0xfb932d456e4c2298adf0a9e7fa0ae32b42e7500645f8896e0c78df82e43a109b` |
-| resolve_claim (retry too soon) | ACCEPTED | retry too soon | `0xbc13da8f1d2463bf03b444e1461dce55eab7ed3c2bc37267cd8081232591e63d` |
-| resolve_claim #10 (attempt 1) | FINALIZED |  | `0x735c7f57b360e620a134589a88427634c3c95f3bf5362617b0977327e467806b` |
-| submit_claim(01-high-heap-overflow.md) | FINALIZED |  | `0x92c7e34a9db2bc08783f08269041030c906151cb928aec8c06a98cb3cc572fb5` |
-| submit_claim(x) | FINALIZED |  | `0x0f5f29a358c97ba1b7fdf02b330a33d1be29583a5224bbc6fde6ade5d3097aa7` |
-| submit_claim(02-medium-oob-read.md) | ACCEPTED |  | `0xcd365d039c2c9a67acf29aa0f6f8cc1ce9b2f39885724721feb53e59490f80c1` |
-| submit_claim(02-medium-oob-read.md) | FINALIZED |  | `0xd0a40e18509a8ba04668a45dc8336a870adc20e9485ef4dba76dd3b0e7af351b` |
-| resolve_claim #11 (attempt 1) | FINALIZED |  | `0xf64c18edac205aaf39697cab9e128b87068bdfb9f179cd5a16f54142e4cde15e` |
-| withdraw(reserve bounty) | FINALIZED |  | `0x9e83b2dc631b6db8ac2fd3baf0e850ac8c6996e3cafae132fe0faa5a523bcd9f` |
-| submit_claim(report) | FINALIZED |  | `0x94361405d9221429b474748c7775fd21bfec93d8bf41db928766aab06189ee64` |
-| resolve_claim #1 (attempt 1) | FINALIZED |  | `0x36990bfdc005e9a1161803699b5810d377a3d4ca3108c3d310bc7c8404fa4b30` |
-| create_bounty(Full-history bounty) | ACCEPTED |  | `0xc2c418d9f30538be8336480d11558461ecc607ae23775e7f07726a5694a9bf4a` |
-| submit_claim(01-high-heap-overflow.md) | ACCEPTED |  | `0xaea76ebe87154b7503fd5f683ed6f83158fe5de311934cc3eb38db20a5478574` |
-| resolve_claim #12 (attempt 1) | FINALIZED |  | `0xc7f925b7ce193bdd63704b53dfd2bcda8d49a7548f042adf7041d06bb6103569` |
-| submit_claim(h01-read-flags.md) | ACCEPTED |  | `0xf56aff14415e19ac3f5ac6255c7c81be0b0f3687358631dcc7fa10b05f6c08dc` |
-| resolve_claim #13 (attempt 1) | FINALIZED |  | `0x941b11d3f6e6268a84e46bab9a5245001741a97afda3401ba689371caf7de3a5` |
-| submit_claim(h02-open-section.md) | ACCEPTED |  | `0x32ade30d7b420d2ca7b9e5243132d63d00f7ea65273cea1ebe323c8ddb44c215` |
-| resolve_claim #14 (attempt 1) | FINALIZED |  | `0x30a5fb7a8eaaf411b0ed0385726e31d14c6c0ebf958668f079c43b9984c501f9` |
-| submit_claim(h03-decode-utf8.md) | ACCEPTED |  | `0x2c2c19a6de2afac2e50e14d135deac386ede49dca18666eb6c9b4a2a3c0fcedd` |
-| resolve_claim #15 (attempt 1) | FINALIZED |  | `0xe37dcd916b36d25595cc381204d943487d0cca7bc50e048e30d311ec6460240e` |
-| submit_claim(h04-read-alias.md) | ACCEPTED |  | `0x11f9d492a215ed46c271bc272aae881142a226f510659d546f699a968a113fb2` |
-| resolve_claim #16 (attempt 1) | FINALIZED |  | `0xf60337d2f92f049aa94ae2e5aee2618b4c60cff52f3dc9dc299b2fdbb711a7ce` |
-| submit_claim(h05-parse-version.md) | ACCEPTED |  | `0x86512dc066895a0b6ecfdb5d089a84b9007d2ae433a5f847dbf84255ba6d10bc` |
-| resolve_claim #17 (attempt 1) | FINALIZED |  | `0x33fddf896ded168b452facd5d53e4abde06cdaacdc927ca8127346866380bc45` |
-| submit_claim(h06-load-schema.md) | ACCEPTED |  | `0x6951d1efb958f5039ab618f6130c918316c79c1749796b928ce7eaf634b8e0f2` |
-| resolve_claim #18 (attempt 1) | FINALIZED |  | `0x6d878189cfed196e4b77cb5fa322e7ac5a87df71ad939ce63abb531ca85cea64` |
-| submit_claim(h07-next-token.md) | ACCEPTED |  | `0xfcaa60fc12883827a9af3aac36f349540174aef0ebf005f1e6dd8a0fda87954f` |
-| resolve_claim #19 (attempt 1) | FINALIZED |  | `0xf1c2ea5f2415ec9c46c686b17bccd963b36c068bba955d0ad2c543c113b46d93` |
-| submit_claim(h08-apply-patch.md) | ACCEPTED |  | `0x67bff867050f821c2d91d164b8723cc7cf2f7c227d3db806134c6798abc5f4ad` |
-| resolve_claim #20 (attempt 1) | FINALIZED |  | `0xe6df7ba4ea6043cf8ee53d435de5e2ef00404ddc91e430f999eab390daf8c36f` |
-| submit_claim(h09-emit-table.md) | ACCEPTED |  | `0x7879dafd5ffbc28e5c367dea16807c3ac971b0328bfd6c193b1716b2927aa0e2` |
-| resolve_claim #21 (attempt 1) | FINALIZED |  | `0x10a5cae27e7ac333696ab61e86e36b4d3a426f78ec11e74c298966f79b4432b4` |
-| submit_claim(03-duplicate-of-high.md) | ACCEPTED |  | `0xd6ddd58969ce0e49e92fd55d921d94460c4104261e4dcfc67e1c0fa9b219d0bf` |
-| resolve_claim #22 (attempt 1) | FINALIZED |  | `0xc682394112f7d34fec62cb81228a5f895b9119c8b5d04fb6e1a9a431da2aca26` |
-| expire_claim (too early) | ACCEPTED | not expired yet | `0x441c9ae609b1e0f6fd26f5f5ec3a60eaceeba3cd7ccff1e07575ef5790bd80b9` |
-| submit_claim(02-medium-oob-read.md) | ACCEPTED |  | `0xa873fb6664ed3405e56a1cc9bbb4b1ae1f3922e88863df753842f69c23124fa6` |
-| resolve_claim (queued behind an unresolved claim) | ACCEPTED | resolve earlier claim first | `0x6d24a27e449e28d667651f90a1366705f99ae3628a4b094bf7469a4f016ae8a1` |
-| resolve_claim (after the window) | ACCEPTED | claim expired | `0xfea09f1dcd6233fbae1c5b69d354305b70054f65c7afd550030b2a6b85104194` |
-| expire_claim | FINALIZED |  | `0x9c29181d6671fb2a41f9b93c1ed7c97bc7060c3cc44ff3cc8b0a391e2236f382` |
-| resolve_claim #23 (attempt 1) | FINALIZED |  | `0x71e99bd38e53d7fe1995a8fad1948e27f7373abe6d2d4edc2df99d35001fc377` |
+| create_bounty(Withdraw reserve bounty) | ACCEPTED |  | `0x77b7b2c618d5fb438b3d19f060dd27e92096fe62318e9b4d297a9916c441bb6d` |
+| submit_claim(01-high-heap-overflow.md) | ACCEPTED |  | `0x7442b5bdbe72ec463f90d49793c482fb03156d2fb9f2a1cce8f718bb2823ed1c` |
+| create_bounty(Queue and expiry bounty) | ACCEPTED |  | `0xff07561e4044fef457bb32a66762d7505ea4fdea17da7f96d373ef6f92873efe` |
+| submit_claim(report) | ACCEPTED |  | `0xb30acc1a4f2e83c5ac4fcc5bc14475f13674f415d72cbe46c952cc0d6bf1c908` |
+| create_bounty(Main bounty) | ACCEPTED |  | `0xc5abe3d9a0e293823b0c0fffde646463da33bb06cf5448b4c979018adaf36518` |
+| submit_claim(01-high-heap-overflow.md) | ACCEPTED |  | `0x2d8d222efe3356ed045d1a799cb11390c9104b337e63940cd31baf69d336d859` |
+| resolve_claim #3 (attempt 1) | FINALIZED |  | `0xaadc2d645f6499e6f5844d80a666d06ff6e2ba7fe4376caa31a80c0affb975f2` |
+| submit_claim(02-medium-oob-read.md) | ACCEPTED |  | `0x2782b25937167624cdb307253836605425334a318de636c6356eaeb8bd975de8` |
+| resolve_claim #4 (attempt 1) | FINALIZED |  | `0x120e25fe56c88fbb39fdfb5c2f049ab50ab554e334c31730f372a7bc270a848f` |
+| submit_claim(04-out-of-scope-dos.md) | ACCEPTED |  | `0x404ee1047442597311a296b7d4931747e350456b19ecb920e498696ac9a17345` |
+| resolve_claim #5 (attempt 1) | FINALIZED |  | `0xb31dc46f5b80ce17a0d50f0445474ca7472692c42f21f45b189c4d7343756b2c` |
+| submit_claim(05-injection.md) | ACCEPTED |  | `0x2a6d3bb96096c2a9607b3538df3fa13b4bb0e01d65c693d80538138fb8a1ad03` |
+| resolve_claim #6 (attempt 1) | FINALIZED |  | `0x8da53730b9d56c0f42a79e15aadc4fe4d72bd84979cf5e8e2ca4e27f10acf50d` |
+| create_bounty(Precedence bounty) | ACCEPTED |  | `0xe2fd6867863e9d0ddb4b3e4999dab97b462896064a4b6633ba7b1680db03bb07` |
+| submit_claim(01-high-heap-overflow.md) | ACCEPTED |  | `0x69e3d74a36b6a8a7941036389716ec47a59d7086eb76fee2ce14da4633cb2278` |
+| submit_claim(03-duplicate-of-high.md) | ACCEPTED |  | `0x73955d1fb464032e36c1e72da27c34af56677e563b336f05f65caeff5fca44e4` |
+| resolve_claim (copier first, refused) | ACCEPTED | resolve earlier claim first | `0x0cc83dc95b265a355d178925bd1dea4f8736f1165bb6d0d21f0d8830b26a3a6b` |
+| resolve_claim #7 (attempt 1) | FINALIZED |  | `0x9724bfd4548fd5d7a4df14226aa13cf2351a32938362deb5f973f2a79d1ad34c` |
+| resolve_claim #8 (attempt 1) | FINALIZED |  | `0xaf5ff66290b0834f16bb365bfd7b7e5c7e2a0aab685f1c56d253d452bcba0a91` |
+| create_bounty(Commitment bounty) | ACCEPTED |  | `0xfbe50b8c9927c55c35a7ce95ea30e50369d38aaf1ae57c134fd97092b90f9b06` |
+| submit_claim(01-high-heap-overflow.md) | ACCEPTED |  | `0x0d77a9a3347962628653cbaa11c89cefa66e9450ee371fe64a60f8335ee995a9` |
+| resolve_claim #9 (attempt 1) | FINALIZED |  | `0x6e1ef41961f5683c3934f5103267878e8dd6c412e2c54a95e052f7d22f9844f9` |
+| submit_claim(report) | ACCEPTED |  | `0x2627a9228b48c52e795ff7254413a9dd9cf24fcce5dab1edb89b6ed13c7d62be` |
+| resolve_claim #10 (attempt 1) | FINALIZED |  | `0x110f32f2fc9f6ea0dfb4a9d0c09b006be7d2b981dec753b66fbc20021306c1ba` |
+| resolve_claim (retry too soon) | ACCEPTED | retry too soon | `0x07c08d79638f5b014e50307dba1a5a8f76fb725a64d164a7f859ebd91ebd36cf` |
+| resolve_claim #10 (attempt 1) | FINALIZED |  | `0xdecdd63a734e590b573e190878f3f7a0e705b8b7312a2d0ea249d2e62b22d36e` |
+| submit_claim(01-high-heap-overflow.md) | FINALIZED |  | `0x4dbd350a4a5c1c1ba2b2d8c2d8a20b1b5a6d776e34375cdbc5b9609085282820` |
+| submit_claim(x) | FINALIZED |  | `0x668ea47af496b3d978025db59d8a3a970e9e1f0d663156c9659b50966b279e60` |
+| submit_claim(02-medium-oob-read.md) | ACCEPTED |  | `0xafc74910fe6bc20690c5e1bb17dfa3a967d89f8f30e44bd5f3a6104ff9ab18ff` |
+| submit_claim(02-medium-oob-read.md) | FINALIZED |  | `0x29c12b4ed6568766c7c735ed9f9587b0a3acb2f5f21c0a8d61cac53b16a008f0` |
+| resolve_claim #11 (attempt 1) | FINALIZED |  | `0xfe9dc882cfe9640de4d7eb6a266737c72850feee76b1ca6a43fcf14e9579b03e` |
+| withdraw(reserve bounty) | FINALIZED |  | `0xa68956c64e62cf388b474c26af715654b31bc5307244a2f6c852688e5b0c8e00` |
+| submit_claim(report) | FINALIZED |  | `0x7a7f41d4d078d72e92e17394e5950cbc9d8bc39986024ddd32b4f68fa2088e18` |
+| resolve_claim #1 (attempt 1) | FINALIZED |  | `0x0b754b9303c9847989499754d78160087f8ec1b412489831fe9b38b7c35bd705` |
+| create_bounty(Full-history bounty) | ACCEPTED |  | `0xa1ff7a4f6ce230659289e4642289c084b545e1330c5dc97c41c690b2a1b88aee` |
+| submit_claim(01-high-heap-overflow.md) | ACCEPTED |  | `0xc43175030632e929ef3c4633556805c1b869794b4786087fe0f7f295e32fdf5c` |
+| resolve_claim #12 (attempt 1) | FINALIZED |  | `0x9de688ef6c0fd5350bf5447cb215676ab736435c300663dfc001404a29b0fbe0` |
+| submit_claim(h01-read-flags.md) | ACCEPTED |  | `0x8685918a3fa580efb6a258f40a7bb66a2fb119acc85011078e7eda94016e4e9d` |
+| resolve_claim #13 (attempt 1) | FINALIZED |  | `0xb2f47e2418a2fb2a2dff4f091db9b16cdf072c235e324d0d6c6b9dcab315ef59` |
+| submit_claim(h02-open-section.md) | ACCEPTED |  | `0xecc5dc7e28ea065942ad1506e0d91a04e2919cd91ac4b7c4831df9b49792c6ff` |
+| resolve_claim #14 (attempt 1) | FINALIZED |  | `0x9c4b8a0af160068cf9d5a52c949e42de93bd6f0408767f4e9a81c8c94a2f507f` |
+| submit_claim(h03-decode-utf8.md) | ACCEPTED |  | `0xea2406bad2de451e6b74ed64ab4163501abdc89d2f201d17f54f7d48d74a1f7c` |
+| resolve_claim #15 (attempt 1) | FINALIZED |  | `0xe8cfb37fdb7fef7af5f738f236ff341fe00b90d027afdd9dd5e7b7a3b72ea1db` |
+| submit_claim(h04-read-alias.md) | ACCEPTED |  | `0xc2f8a40ea7bc0f87f0b49ec6065f88b05fbf086036150e1d1c15d2e2cf5908dd` |
+| resolve_claim #16 (attempt 1) | FINALIZED |  | `0xe464aa2a7961fc7eb64b2a44735cfb213592a64504a557351ed53fb0c7aecc04` |
+| submit_claim(h05-parse-version.md) | ACCEPTED |  | `0x843ce15e44d81a8e875827c2d109f193b292b6971b6392c207be554f5404b266` |
+| resolve_claim #17 (attempt 1) | FINALIZED |  | `0x0475201764cccfe6394934ef1674c7a2501fdc68a175a8eec57aed6190bf0aa2` |
+| submit_claim(h06-load-schema.md) | ACCEPTED |  | `0xd5cc722b72f43bfffa3ab66fc13f144d23852a6b3d195d26bfc74d8864843958` |
+| resolve_claim #18 (attempt 1) | FINALIZED |  | `0x27e462c45e8f234997d48c5a20ce54b09e3da84e12017706fe9823056cbdb46d` |
+| submit_claim(h07-next-token.md) | ACCEPTED |  | `0xe183e69f227711620b50a34f5e3c81936c429d51b915324728d771fe6ab47b7b` |
+| resolve_claim #19 (attempt 1) | FINALIZED |  | `0x8cafd8deddc42ae84924b2f37368731e4efb5ab29fec3d5af452c624203f08b8` |
+| submit_claim(h08-apply-patch.md) | ACCEPTED |  | `0x6bd2f3271ecebc33158289671aceca5daab3742bb977a6b13dcf6352de44aad9` |
+| resolve_claim #20 (attempt 1) | FINALIZED |  | `0xa12f976ed6f9e98c5922872cdc8ecfcb0f5e74d549768e2cd162fcea8b89a417` |
+| submit_claim(h09-emit-table.md) | ACCEPTED |  | `0x2379f78a4c2a023c34dc0500e5dcc77c1e3a02eaca93cfcefb51a8f54ed31fd9` |
+| resolve_claim #21 (attempt 1) | FINALIZED |  | `0x3876575409aa9511dfd1fdec5aead233f622b227d37a8d4bfa0e5cc4e2e1c682` |
+| submit_claim(03-duplicate-of-high.md) | ACCEPTED |  | `0x21b145005f65a59d3d6fc3e381733005d77ce6f39a68215cd9addb8cdfcb6349` |
+| resolve_claim #22 (attempt 1) | FINALIZED |  | `0x413dc1515e88191ebcc53e23617d8715ddb84600f70086c1cd92c9dd124704cb` |
+| expire_claim (too early) | ACCEPTED | not expired yet | `0x6fedbd6404f2d8a5ac8f574bfe965bd4360da4c5851004a7d1bad3d3c293e9d1` |
+| submit_claim(02-medium-oob-read.md) | ACCEPTED |  | `0x4070c06169f1ba60dab602089583f86b4a5b3e7579da467b199677dd8a510fc6` |
+| resolve_claim (queued behind an unresolved claim) | ACCEPTED | resolve earlier claim first | `0x0def5ac5a53c7566079c0ce497bdfe1c179a4460ed19b886a51849ce19cd60f4` |
+| resolve_claim (after the window) | ACCEPTED | claim expired | `0x7f2ff604f9de268433eb4512c63a6fa47ad347641d29fe3e246903a20c32a79c` |
+| expire_claim | FINALIZED |  | `0x9606372045031fb9214b8433eb116f0c0a9340ecd930c8926dcb895fb820068f` |
+| resolve_claim #23 (attempt 1) | FINALIZED |  | `0x2f8a861475b34a3aa72163d5abca9b1aaac5aa7a5290dfb130702f732e65361c` |

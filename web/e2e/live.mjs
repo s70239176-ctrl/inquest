@@ -261,7 +261,7 @@ await section("TABLE", async () => {
   if (walletA >= HIGH + BOND) {
     check("PAY", "finalized transfer increased the researcher's own wallet balance", true, `wallet ${walletA}`);
   } else {
-    skip("PAY", "finalized transfer increased the researcher's own wallet balance", `NOT demonstrated on Studionet: wallet balance is ${walletA}. Studionet does not credit externally-owned accounts from contract-emitted transfers (measured; see docs/STEWARD-RESPONSE.md).`);
+    skip("PAY", "finalized transfer increased the researcher's own wallet balance", `NOT delivered: wallet balance is ${walletA}, expected at least ${HIGH + BOND}.`);
   }
 });
 

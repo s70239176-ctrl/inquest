@@ -6,8 +6,7 @@
 //   3. bounty cancellation              (cancel)
 //   4. project withdrawal               (withdraw after the deadline)
 //
-// It needs two FUNDED accounts. On Studionet fresh keys work but contract-emitted transfers do not credit ordinary
-// accounts (measured), so this script is expected to report NOT DELIVERED there; run it on a testnet:
+// On Studionet fresh throwaway keys are enough (transactions are gasless). On a testnet it needs funded accounts:
 //
 //   cd web
 //   INQUEST_CHAIN=testnetBradbury PROJECT_KEY=0x... RESEARCHER_KEY=0x... \

@@ -4,25 +4,30 @@ Each point of the review, what changed, where the evidence is, and what is **not
 
 | | |
 | --- | --- |
-| **Contract (v2)** | `0xb65Ff1E3F4DDE55fF56d3A5ee98f51aDB7944630` on Studionet, deployed with retry gap 6 h, 3 unreachable attempts, claim expiry 14 days. Deploy tx `0x6e759e8f45c53ce64df08ec3b20ddfb25bbe42fdbd642ba84f8da07a9935384e`. Seeded with one finalized example: bounty 1, claim 1, resolve tx `0xd0d3a795718d68f9f4299857aae745e199aa750848fb62aa0a906dbe50d18231` (FINALIZED, verdict high). |
-| **Live suite contract** | `0x6c467DB3E69746a9D9f9fCa6d8c580FCd306b245` (short windows so retry and expiry can run in one sitting): [docs/E2E-REPORT.md](E2E-REPORT.md), **44 passed, 1 not demonstrated, 0 failed**, 54 minutes, every transaction hash listed. |
-| **Contract-wallet delivery contract** | `0xF72403393A2a246c64C6aA984471d0CB2E0bA39D`: [docs/WALLET-DELIVERY-studionet-contract-wallets.md](WALLET-DELIVERY-studionet-contract-wallets.md), **6/6 delivered**. |
+| **Contract (v2)** | `0x163CD9562dd603C146a6461d1C1c7655AD556fF7` on Studionet, deployed with retry gap 6 h, 3 unreachable attempts, claim expiry 14 days. Deploy tx `0x9f7a388cd7256d189dac785b599a492cdfa4c43c68689532817fe093aa43ef7e`. Seeded with one finalized example: bounty 1, claim 1, resolve tx `0x818bb761d770a92b4557afd29e6324d725f40009af8fd0bd1729f3f7055b0dc5` (FINALIZED, verdict high). |
+| **Live suite contract** | `0xb2Da7DFe1417D77B858e8D9e306b646b16eA3729` (short windows so retry and expiry can run in one sitting): [docs/E2E-REPORT.md](E2E-REPORT.md), **45 passed, 0 failed**, about an hour, every transaction hash listed. |
+| **Plain-wallet delivery contract** | `0xf4DD8CdA92de0850e3b0109243E32E03dd16Af47`: [docs/WALLET-DELIVERY-Genlayer-Studio-Network.md](WALLET-DELIVERY-Genlayer-Studio-Network.md), **5/5 delivered** to ordinary accounts. |
 | **Offline suite** | `tests/direct`: **116 passed** (contract v2, mocked web and model). `web`: **48 unit tests passed**, typecheck and production build clean. |
 
 ## 1. Recipient-wallet delivery
 
 *Asked: finalized GenVM execution, outgoing transfer results and actual wallet-balance increases for researcher rewards, bond refunds, bounty cancellations and project withdrawals.*
 
-What exists:
+**Found and fixed.** An earlier version of this document said Studionet cannot credit ordinary accounts from contract payments. That was wrong about the cause: a normal contract message (`emit_transfer` on a contract handle) must reach a *contract*, so a payout to a plain account ended in a GenVM "Contract not found" error and was never credited. The sibling project Stagehold had already found the way round it: send through the SDK's EVM-style plain send (`gl.evm.contract_interface`), which credits any address, needs no GenVM run, and lands only when the transaction that emitted it is finalized. Inquest's single payment function (`_pay` in `contracts/inquest.py`) now uses that. Nothing else about the money logic changed.
 
-- Every payment is `emit_transfer(on="finalized")`, unchanged. The live suite shows balances unchanged at `ACCEPTED` and moved at `FINALIZED` (checks 2c, 2d).
-- `web/e2e/contract-wallet.mjs` runs all four paths with **smart-contract wallets** (`tests/support/proxy_wallet.py`) as project and researchers and reads each wallet's own balance before and after the finalized transfer: reward + bond refund `0 → 10100` (expected +10100), duplicate bond refund `0 → 100`, cancellation `0 → 10000`, withdrawal `10000 → 30000`; the failed-payment ledger stayed empty. Resolve transactions are `FINALIZED` in the report.
-- `web/e2e/wallet-delivery.mjs` runs the same four paths with **externally-owned accounts** on a network you choose (`INQUEST_CHAIN=testnetBradbury`), reading the researcher's and project's own balances. It reports `DELIVERED` / `NOT DELIVERED` per path and writes `docs/WALLET-DELIVERY-<network>.md`.
+**Evidence, on ordinary accounts (fresh throwaway keys, balances read with `eth_getBalance` before and after the finalized resolve/cancel/withdraw transaction):** `web/e2e/wallet-delivery.mjs` against Studionet, report [docs/WALLET-DELIVERY-Genlayer-Studio-Network.md](WALLET-DELIVERY-Genlayer-Studio-Network.md), **5/5 delivered**:
 
-What is **not** demonstrated:
+| Path | Recipient balance | Expected |
+| --- | --- | --- |
+| Researcher reward + bond refund (resolve, accepted high finding) | 0 → 0.1005 GEN | +0.1005 |
+| Bond refund only (duplicate, no reward) | 0 → 0.0005 GEN | +0.0005 |
+| Bounty cancellation (pool back to the project) | 0 → 0.1 GEN | +0.1 (the project paid no fee on Studionet) |
+| Project withdrawal after the deadline | 0 → 0.1 GEN | +0.1 |
+| Failed-payment ledger after all of the above | 0 | 0 |
 
-- **Delivery to an externally-owned account has not been shown on any network.** Studionet does not credit EOAs from contract-emitted transfers: the live suite's `PAY` check records the researcher's balance staying at 0 after a finalized payout, and the contract's own balance falling by exactly the amount owed. The testnet script needs two funded accounts (about 0.6 GEN and 0.01 GEN plus fees). It has been syntax-checked, but it has **not** been run against a testnet because no funded key was available to the build.
-- The contract-wallet result proves the transfers deliver finalized value to a recipient's own balance when the recipient can receive it. It is a stand-in for the EOA result, not a replacement.
+Every resolve transaction in that run reached `FINALIZED`, the claim read back as `RESOLVED` with the expected payout and bond outcome, and the full live suite (`web/e2e/live.mjs`, check `PAY`) repeats the reward check: the researcher's own wallet balance read 10100 (payout + bond) after the finalized resolve.
+
+What is **not** demonstrated: a network other than Studionet. `wallet-delivery.mjs` takes `INQUEST_CHAIN=testnetBradbury` and funded keys and was not run there (no funded key was available to the build).
 
 ## 2. Duplicate verification across the whole accepted history
 
@@ -54,7 +59,7 @@ What is **not** demonstrated:
 - **Permanently unresolved consensus.** `expire_claim` (anyone, after `claim_expiry`): bond returned, no reward, the attempt is not counted against the researcher, the queue moves on, and an expired claim can no longer be resolved. Offline: six consecutive invalid jury answers leave the claim `PENDING` with no money moved, then expiry returns the bond. **Live (Q1-Q6):** refused before the window (`not expired yet`), a queued claim cannot jump ahead, after the window the stuck claim cannot be judged (`claim expired`), a stranger expires it and the bond is returned on finalization, the next claim becomes head and is paid.
   - Trade-off: a researcher with a valid finding who hits a permanently undeterminable jury gets their bond back and no reward; they can refile.
 - **Failed payments.** `__on_errored_message__` records returned value against the recipient it could not reach; `recover_failed_payment(to)` lets that recipient collect it to any address, clearing the ledger first. Offline: recording, accumulation, recovery to another address, no double recovery, and conservation.
-  - **Not demonstrated live:** Studionet does not invoke this callback (the one failed transfer observed there, to an EOA, returned nothing to the contract). It is exercised only by simulating the callback in Direct Mode. Which address the callback's `sender_address` carries is taken from the SDK documentation (`self.failed_transfers.append((gl.message.sender, failed_value))`); it has not been confirmed on a network that fires it.
+  - **Not demonstrated live:** Studionet does not invoke this callback (the only failed transfer ever observed there was the old contract-message payout to a plain account, which returned nothing to the contract and is no longer how payments are sent). It is exercised only by simulating the callback in Direct Mode. Which address the callback's `sender_address` carries is taken from the SDK documentation (`self.failed_transfers.append((gl.message.sender, failed_value))`); it has not been confirmed on a network that fires it.
 
 ## 6. Testing the steward asked for
 
@@ -68,7 +73,7 @@ What is **not** demonstrated:
 | Authoritative contract-state readbacks | the live suite reads `get_params`, `get_bounty` (reserved, head, accepted ids, withdrawable) and `get_claim` (evidence state, note, attempts) after every step |
 | Finalized consensus results | every settling transaction is waited to `FINALIZED`; votes are recorded in the report notes |
 | Source-integrity evidence | `evidence_hash`, `evidence_state`, `note` on every claim; shown in the claim page and jury card |
-| Recipient-wallet payment verification | contract wallets: 6/6; EOA: **not demonstrated** (section 1) |
+| Recipient-wallet payment verification | ordinary accounts on Studionet: 5/5 delivered (section 1); other networks not run |
 | **Complete MetaMask-driven transactions** | **Not performed.** The build tooling cannot operate a browser-extension wallet, and the live suites sign with throwaway keys. The app's wallet path shares `sendTx` with the demo-account path but has not been driven by MetaMask here. [docs/METAMASK-CHECKLIST.md](METAMASK-CHECKLIST.md) is a ten-step walkthrough, with what to record at each step, for someone with MetaMask to run. |
 
 ## Other things that remain true

@@ -20,7 +20,7 @@ Character counts are checked against the form's limits.
 
 **Description (877/1000):**
 
-> Inquest is a bug bounty with no reviewer to trust. A project locks GEN and a frozen rubric (scope, duplicates, severity bars). A researcher submits one public writeup URL and a small bond. Each GenLayer validator fetches the page itself and answers five fixed fields: evidence_available, demonstrated, in_scope, duplicate_of, severity. Validators accept the leader only if all five match their own result; prose is never compared. A deterministic table then pays, slashes or refunds, and GEN moves only when the verdict finalizes. A page that tells the model to pay is treated as evidence, never a command. If the jury cannot agree, no money moves. Reports are judged in submission order, against every earlier accepted finding, and a page edited after filing is slashed. Verified live on Studionet: 44 of 45 checks (the 45th, delivery to a plain wallet, is a Studionet limit).
+> Inquest is a bug bounty with no reviewer to trust. A project locks GEN and a frozen rubric (scope, duplicates, severity bars). A researcher submits one public writeup URL and a small bond. Each GenLayer validator fetches the page itself and answers five fixed fields: evidence_available, demonstrated, in_scope, duplicate_of, severity. Validators accept the leader only if all five match their own result; prose is never compared. A deterministic table then pays, slashes or refunds, and GEN moves only when the verdict finalizes. A page that tells the model to pay is treated as evidence, never a command. If the jury cannot agree, no money moves. Reports are judged in submission order, against every earlier accepted finding, and a page edited after filing is slashed. Verified live on Studionet: 45 of 45 checks (plus payouts, refunds, cancellation and withdrawal each reaching an ordinary wallet's balance).
 
 ## 04 Demo video
 
@@ -37,7 +37,7 @@ Each item is one step: heading (optional) then instruction.
 5. **Run the jury.** Click **Resolve** on the claim (claims are judged oldest first). The validators each fetch the page and vote. Allow up to about two minutes.
 6. **Inspect the verdict.** Click the claim number to see the five fields and the settlement timeline. Then open the bounty's **Jury review** tab and click **Load validator votes** to see each validator's vote.
 
-Shortcut (optional): https://inquest-repro.vercel.app/#/b/1/jury opens two real, finalized claims (a high payout and a medium payout). To see the validators' votes for claim 1, click **Read votes** and paste its resolve transaction `0xd0d3a795718d68f9f4299857aae745e199aa750848fb62aa0a906dbe50d18231`.
+Shortcut (optional): https://inquest-repro.vercel.app/#/b/1/jury opens a real, finalized claim (a high payout). To see the validators' votes for claim 1, click **Read votes** and paste its resolve transaction `0x818bb761d770a92b4557afd29e6324d725f40009af8fd0bd1729f3f7055b0dc5`.
 
 ## 06 Review verification
 
@@ -45,9 +45,9 @@ Shortcut (optional): https://inquest-repro.vercel.app/#/b/1/jury opens two real,
 
 > The claim shows its evidence commitment, then evidence_available true, demonstrated true, in_scope true, duplicate_of null, severity high (the jury is a model, so borderline pages can differ; this fixture was rated high in every live run). Payout equals the bounty's high payout (1 GEN in the example) and the 0.01 GEN bond is returned. GEN does not move until the resolve tx is FINALIZED. Jury review lists the validators' votes (agree/idle).
 
-**Contract link 1:** https://explorer-studio.genlayer.com/address/0xb65Ff1E3F4DDE55fF56d3A5ee98f51aDB7944630
+**Contract link 1:** https://explorer-studio.genlayer.com/address/0x163CD9562dd603C146a6461d1C1c7655AD556fF7
 
-(Deploy transaction: https://explorer-studio.genlayer.com/tx/0x6e759e8f45c53ce64df08ec3b20ddfb25bbe42fdbd642ba84f8da07a9935384e)
+(Deploy transaction: https://explorer-studio.genlayer.com/tx/0x9f7a388cd7256d189dac785b599a492cdfa4c43c68689532817fe093aa43ef7e)
 
 ## 07 Project links
 

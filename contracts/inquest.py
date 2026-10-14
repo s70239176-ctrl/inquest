@@ -81,6 +81,25 @@ _BLANKS_RE = re.compile(r"\n(?:[ \t\r\f\v]*\n)+")
 _WS = " \t\n\r\f\v"
 
 
+# Paying a person. A normal contract message must reach a contract: on Studionet a payout to an ordinary account ended
+# in a GenVM "Contract ... not found" error and was never credited. An EVM-style plain send is the SDK's own way to send
+# native tokens to any address: the recipient's account is credited, no GenVM run is needed, and (like every emitted
+# message) it lands only once the transaction that emitted it is FINALIZED. Found by Stagehold, measured live there.
+try:
+    from genlayer.gl.evm import contract_interface as _evm_interface
+except ImportError:
+    from genlayer.gl._internal.eth import evm_contract_interface as _evm_interface
+
+
+@_evm_interface
+class _Recipient:
+    class View:
+        pass
+
+    class Write:
+        pass
+
+
 # ------------------------------------------------------------ pure helpers
 def _fail(reason: str):
     raise gl.vm.UserError(reason)
@@ -460,7 +479,7 @@ class Inquest(gl.Contract):
     def _pay(self, to: Address, amount: int) -> None:
         """Every GEN movement is a transfer that executes on FINALIZATION, never on provisional accept."""
         if amount > 0:
-            gl.get_contract_at(to).emit_transfer(value=u256(amount), on="finalized")
+            _Recipient(to).emit_transfer(value=u256(amount), on="finalized")
 
     def _refuse(self, reason: str, value: int) -> dict:
         """

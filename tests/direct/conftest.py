@@ -113,6 +113,11 @@ def world(direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie):
             msg = request["PostMessage"]
             transfers.append({"to": hexof(msg["address"]), "value": int(msg["value"]), "on": msg["on"]})
             return {"ok": None}
+        if "EthSend" in request:
+            # a plain account-to-account send (how payouts reach ordinary wallets); it lands when its tx finalizes
+            msg = request["EthSend"]
+            transfers.append({"to": hexof(msg["address"]), "value": int(msg["value"]), "on": "finalized"})
+            return {"ok": None}
         return None
 
     direct_vm._gl_call_hook = hook

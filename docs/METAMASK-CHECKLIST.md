@@ -21,5 +21,5 @@ For every step, write down the **transaction hash** MetaMask shows and the **acc
 
 Notes for the reviewer:
 
-- Step 7 and the final balance of step 8/9 only prove delivery on a network that credits externally-owned accounts from contract-emitted transfers. Studionet does not (measured, see `docs/STEWARD-RESPONSE.md`). `web/e2e/wallet-delivery.mjs` runs the same four payment paths with funded keys and reads the recipient balances directly.
+- Steps 7, 8 and 9 read your own wallet balance after finalized payments, which Studionet now credits (see `docs/STEWARD-RESPONSE.md`). `web/e2e/wallet-delivery.mjs` runs the same four payment paths with scripted keys and reads the recipient balances directly.
 - Every payable action runs a dry run first; a contract refusal is shown in plain language and the attached value is refunded on finalization.

@@ -68,7 +68,7 @@ A transaction that **raises** keeps its attached GEN inside the contract on this
 ## Known platform behaviors the design accounts for
 
 - **Appeals.** On Studionet the SDK's chain config has no appeals contract: `canAppeal` and the charge quote are unsupported, and an `appealTransaction` is rejected by the node ("Invalid transaction data"; the SDK sends `submitAppeal` as a plain EVM call to the consensus address). The contract has no `appeal` method either way: appeals belong to the protocol. The claim page shows the window (round `ACCEPTED`, not yet `FINALIZED`), the quoted charge where the network quotes one, and the Appeal button only where the network accepts the transaction.
-- Studionet does not credit ordinary accounts on `emit_transfer`, so the live suite proves money movement through the contract's own balance. Recipient-wallet delivery needs a network that does; see `docs/STEWARD-RESPONSE.md` and `web/e2e/wallet-delivery.mjs`.
+- **Paying a person.** A normal contract message (`emit_transfer` on a contract handle) must reach a contract; on Studionet a payout to an ordinary account ended in a GenVM "Contract not found" error and never arrived. All payments therefore use the SDK's EVM-style plain send (`gl.evm.contract_interface`), which credits any address, needs no GenVM run and lands only when the emitting transaction finalizes. This is how the sibling project Stagehold pays. `web/e2e/wallet-delivery.mjs` reads recipients' own balances to prove it.
 - `genlayer-js@2.0.0-rc.1` cannot read from or deploy to the live Studionet; the app pins 1.1.8 and feature-detects the newer calls.
 - The model often omits a `null` field; an absent `duplicate_of` is read as `null`. Any other missing field makes the answer invalid.
 
